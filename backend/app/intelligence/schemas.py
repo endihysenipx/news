@@ -132,6 +132,34 @@ class NewsFeedOut(BaseModel):
     items: list[FeedItemOut]
     hasLiveSources: bool
     emailConfigured: bool
+    aiConfigured: bool
+
+
+class DeepInsightOut(BaseModel):
+    itemId: str
+    generatedAt: datetime
+    keyPoints: list[str]
+    businessImpact: str
+    recommendedActions: list[str]
+    openQuestions: list[str]
+    confidence: Literal["high", "medium", "low"]
+    evidenceLimitations: str | None
+
+
+class BriefSignalOut(BaseModel):
+    itemId: str
+    title: str
+    url: str
+    insight: str
+    nextStep: str
+
+
+class StrategicBriefOut(BaseModel):
+    generatedAt: datetime
+    headline: str
+    overview: str
+    signals: list[BriefSignalOut]
+    watchouts: list[str]
 
 
 class EmailShareOut(BaseModel):

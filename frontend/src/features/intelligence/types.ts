@@ -45,6 +45,25 @@ export interface DailyBrief {
   closingNote: string
 }
 
+export interface DeepInsight {
+  itemId: string
+  generatedAt: string
+  keyPoints: string[]
+  businessImpact: string
+  recommendedActions: string[]
+  openQuestions: string[]
+  confidence: "high" | "medium" | "low"
+  evidenceLimitations: string | null
+}
+
+export interface StrategicBrief {
+  generatedAt: string
+  headline: string
+  overview: string
+  signals: { itemId: string; title: string; url: string; insight: string; nextStep: string }[]
+  watchouts: string[]
+}
+
 export type SourceType = "WEBSITE" | "RSS" | "LINKEDIN" | "FACEBOOK" | "API" | "OTHER"
 export type SourceStatus = "ACTIVE" | "PAUSED"
 export type SourcePriority = "HIGH" | "NORMAL" | "LOW"

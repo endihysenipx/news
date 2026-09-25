@@ -17,11 +17,12 @@ from app.config import settings
 from app.db import get_db
 from app.intelligence.collection import check_source, linkedin_configured
 from app.intelligence.email_service import INTELLIGENCE_RECIPIENT, send_news_email
+from app.intelligence.insights import InsightGenerationError, cached_brief, deep_insight, strategic_brief
 from app.intelligence.linkedin_adapter import LinkedInCollectionError
 from app.intelligence.models import NewsAnalysis, NewsItem, NewsSource, NewsUserState
 from app.intelligence.priority import news_priority
 from app.intelligence.rss_adapter import rss_url_is_supported
-from app.intelligence.schemas import EmailShareOut, IntelligenceStatusOut, NewsFeedOut, NewsSourceCreate, NewsSourceOut, NewsSourceUpdate, SourceCheckOut
+from app.intelligence.schemas import DeepInsightOut, EmailShareOut, IntelligenceStatusOut, NewsFeedOut, NewsSourceCreate, NewsSourceOut, NewsSourceUpdate, SourceCheckOut, StrategicBriefOut
 from app.intelligence.website_adapter import source_kind
 
 router = APIRouter()
@@ -75,7 +76,7 @@ async def list_items(
     elif read_state == "read":
         query = query.where(NewsUserState.read_at.is_not(None))
     rows = (await db.execute(query)).all()
-    return NewsFeedOut(hasLiveSources=has_live_sources, emailConfigured=bool(settings.EMAIL_USER and settings.EMAIL_PASSWORD), items=[{
+    return NewsFeedOut(hasLiveSources=has_live_sources, emailConfigured=bool(settings.EMAIL_USER and settings.EMAIL_PASSWORD), aiConfigured=bool(settings.OPENAI_API_KEY), items=[{
         "id": str(item.id), "sourceId": str(source.id), "sourceName": source.name,
         "sourceType": source.type, "externalId": item.external_id,
         "url": item.url, "title": item.title, "originalText": item.original_text,
@@ -95,6 +96,66 @@ async def list_items(
         },
         "savedAt": saved_at.isoformat() if saved_at else None,
     } for item, source, analysis, read_at, emailed_at, saved_at in rows])
+
+
+async def _brief_rows(db: AsyncSession) -> list[tuple[NewsItem, NewsSource, NewsAnalysis]]:
+    rows = (await db.execute(
+        select(NewsItem, NewsSource, NewsAnalysis)
+        .join(NewsSource, NewsSource.id == NewsItem.source_id)
+        .join(NewsAnalysis, NewsAnalysis.news_item_id == NewsItem.id)
+        .order_by(NewsItem.published_at.desc().nullslast(), NewsItem.created_at.desc())
+        .limit(80)
+    )).all()
+    return [tuple(row) for row in rows]
+
+
+@router.get("/brief", response_model=StrategicBriefOut | None)
+async def get_strategic_brief(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> StrategicBriefOut | None:
+    rows = await _brief_rows(db)
+    return await cached_brief(db, rows) if rows else None
+
+
+@router.post("/brief", response_model=StrategicBriefOut)
+async def generate_strategic_brief(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> StrategicBriefOut:
+    if not settings.OPENAI_API_KEY:
+        raise HTTPException(status_code=503, detail="OpenAI analysis is not configured.")
+    rows = await _brief_rows(db)
+    if not rows:
+        raise HTTPException(status_code=404, detail="No updates are available for a briefing yet.")
+    try:
+        return await strategic_brief(db, rows)
+    except InsightGenerationError as exc:
+        logger.exception("Could not generate strategic brief")
+        raise HTTPException(status_code=502, detail="Could not generate the briefing right now.") from exc
+
+
+@router.post("/items/{item_id}/deep-analysis", response_model=DeepInsightOut)
+async def analyze_item_deeply(
+    item_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> DeepInsightOut:
+    if not settings.OPENAI_API_KEY:
+        raise HTTPException(status_code=503, detail="OpenAI analysis is not configured.")
+    result = (await db.execute(
+        select(NewsItem, NewsSource, NewsAnalysis)
+        .join(NewsSource, NewsSource.id == NewsItem.source_id)
+        .join(NewsAnalysis, NewsAnalysis.news_item_id == NewsItem.id)
+        .where(NewsItem.id == item_id)
+    )).one_or_none()
+    if result is None:
+        raise HTTPException(status_code=404, detail="Update not found")
+    try:
+        return await deep_insight(db, *result)
+    except InsightGenerationError as exc:
+        logger.exception("Could not analyze update %s", item_id)
+        raise HTTPException(status_code=502, detail="Could not analyze this update right now.") from exc
 
 
 @router.post("/items/{item_id}/email", response_model=EmailShareOut)

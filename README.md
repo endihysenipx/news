@@ -23,6 +23,8 @@ Run one backend worker because the five-minute scheduler lives in the API proces
 
 `OPENAI_API_KEY` enables structured article analysis. `BRIGHTDATA_API_TOKEN` enables LinkedIn post checks. Website and RSS collection work without those credentials, with a basic fallback analysis when OpenAI is absent. `EMAIL_USER` and `EMAIL_PASSWORD` enable the Email button; the destination defaults to `180primex.eu@gmail.com`. The service checks Gmail SMTP port 587 and uses TLS port 465 if 587 cannot be reached. Email delivery still depends on outbound SMTP access from the new host.
 
+With OpenAI configured, the Overview page can generate a Strategic Brief from the latest saved analyses. Each live article also has a Deep analysis action with key points, business impact, suggested next steps, and questions to verify. Both actions run only when clicked and cache their results in the database; the brief updates when the set of recent articles changes or on a new UTC day. Existing imported articles can use these actions without being recollected. The AI output is based on saved source material, so verify consequential details at the original link.
+
 `NEWS_ENABLE_COLLECTION=true` starts scheduled source checks every five minutes. Each source's own interval determines whether a check actually runs. Set it to `false` while reviewing the imported snapshot without collecting new content.
 
 Website collection currently supports the KIESA and EU Digital URL shapes implemented in `backend/app/intelligence/website_adapter.py`. Other websites, Facebook pages, and arbitrary APIs can be added as sources but need a connector before they collect posts. LinkedIn needs the Bright Data token and public post availability depends on the provider.
