@@ -17,10 +17,11 @@ from app.config import settings
 from app.db import get_db
 from app.intelligence.collection import check_source, linkedin_configured
 from app.intelligence.email_service import INTELLIGENCE_RECIPIENT, send_news_email
+from app.intelligence.focus import opportunity_focus_score
 from app.intelligence.insights import InsightGenerationError, cached_brief, deep_insight, strategic_brief
 from app.intelligence.linkedin_adapter import LinkedInCollectionError
 from app.intelligence.models import NewsAnalysis, NewsItem, NewsSource, NewsUserState
-from app.intelligence.priority import news_priority
+from app.intelligence.priority import analyzed_news_priority
 from app.intelligence.rss_adapter import rss_url_is_supported
 from app.intelligence.schemas import DeepInsightOut, EmailShareOut, IntelligenceStatusOut, NewsFeedOut, NewsSourceCreate, NewsSourceOut, NewsSourceUpdate, SourceCheckOut, StrategicBriefOut
 from app.intelligence.website_adapter import source_kind
@@ -85,7 +86,8 @@ async def list_items(
         "createdAt": item.created_at.isoformat(), "location": None,
         "readAt": read_at.isoformat() if read_at else None,
         "emailedAt": emailed_at.isoformat() if emailed_at else None,
-        "priority": news_priority(source.priority, analysis.importance_score, analysis.relevance_score),
+        "focusScore": opportunity_focus_score(item, source, analysis),
+        "priority": analyzed_news_priority(item, source, analysis),
         "analysis": {
             "summary": analysis.summary, "category": analysis.category,
             "importanceScore": analysis.importance_score, "relevanceScore": analysis.relevance_score,

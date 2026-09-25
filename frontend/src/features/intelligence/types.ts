@@ -35,6 +35,7 @@ export interface NewsEntry {
   savedAt?: string | null
   location: string | null
   priority: NewsPriority
+  focusScore?: number
   analysis: NewsAnalysis
 }
 

@@ -28,12 +28,14 @@ def _news():
         title="  Digital grant\nfor SMEs  ",
         url="https://example.org/grants/123",
         published_at=datetime(2026, 9, 24, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 24, tzinfo=timezone.utc),
     )
-    source = SimpleNamespace(name="KIESA", priority="NORMAL")
+    source = SimpleNamespace(name="KIESA", url="https://kiesa.rks-gov.net/calls", priority="NORMAL")
     analysis = SimpleNamespace(
         category="GRANT", importance_score=88, relevance_score=83,
         summary="Applications are open for Kosovo SMEs.",
         why_it_matters="Relevant for local technology companies.",
+        tags=["Kosovo", "AI"],
         deadline=date(2026, 10, 18), funding_amount="€50,000", eligibility="Kosovo SMEs",
     )
     return item, source, analysis

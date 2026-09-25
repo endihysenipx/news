@@ -125,6 +125,7 @@ class FeedItemOut(BaseModel):
     savedAt: str | None
     location: str | None
     priority: Literal["HIGH", "NORMAL"]
+    focusScore: int
     analysis: FeedAnalysisOut
 
 

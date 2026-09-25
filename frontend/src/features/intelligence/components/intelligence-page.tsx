@@ -24,7 +24,7 @@ const opportunityCategories = new Set(["GRANT", "TENDER", "BUSINESS", "PARTNERSH
 function matchFilter(item: NewsEntry, filter: NewsFilter) {
   const { category, relevanceScore, tags } = item.analysis
   switch (filter) {
-    case "For You": return relevanceScore >= 70
+    case "For You": return category === "GRANT" || category === "TENDER" ? (item.focusScore ?? 0) >= 100 : relevanceScore >= 70
     case "All": return true
     case "Grants": return category === "GRANT"
     case "Tenders": return category === "TENDER"
@@ -181,7 +181,7 @@ export function IntelligenceWorkspace({ view, user, apiFetch }: { view: Intellig
 
   const visibleItems = React.useMemo(() => {
     const needle = query.trim().toLowerCase()
-    return items.filter((item) => {
+    const matching = items.filter((item) => {
       if (view === "saved" && !savedIds.includes(item.id)) return false
       if (view !== "saved") {
         const isRead = isDemo ? demoReadIds.includes(item.id) : Boolean(item.readAt)
@@ -193,6 +193,9 @@ export function IntelligenceWorkspace({ view, user, apiFetch }: { view: Intellig
       if (!needle) return true
       return [item.title, item.analysis.summary, item.sourceName, ...item.analysis.tags].some((value) => value.toLowerCase().includes(needle))
     })
+    return view === "overview" || view === "opportunities"
+      ? matching.sort((a, b) => (b.focusScore ?? 0) - (a.focusScore ?? 0))
+      : matching
   }, [items, view, savedIds, demoReadIds, isDemo, readMode, highPriorityOnly, filter, query])
 
   const opportunities = items.filter((item) => opportunityCategories.has(item.analysis.category)).length
@@ -219,7 +222,7 @@ export function IntelligenceWorkspace({ view, user, apiFetch }: { view: Intellig
           <div className="mt-5 space-y-3">{loading ? <FeedSkeleton /> : error ? <div role="alert" className="rounded-xl border border-[#e8eae7] bg-white px-6 py-10 text-center"><AlertCircle className="mx-auto size-6 text-[#89998b]" /><h3 className="mt-3 font-semibold">Updates could not be loaded.</h3><p className="mt-1 text-sm text-[#7f8a80]">Please refresh the page and try again.</p></div> : visibleItems.length ? visibleItems.map((item) => <NewsCard key={item.id} item={item} saved={savedIds.includes(item.id)} read={isDemo ? demoReadIds.includes(item.id) : Boolean(item.readAt)} canEmail={!isDemo && emailConfigured} canAnalyze={!isDemo && aiConfigured} apiFetch={apiFetch} emailSending={emailingId === item.id} emailBusy={Boolean(emailingId)} onEmail={(id) => void sendEmail(id)} onToggleSaved={toggleSaved} onSetRead={setRead} />) : <FeedEmptyState view={view} readMode={readMode} priorityOnly={highPriorityOnly} narrowed={Boolean(query.trim()) || highPriorityOnly || filter !== "All" && !(view === "overview" && filter === "For You")} onReset={() => { router.push(view === "overview" ? "/intelligence/news" : "/intelligence/" + view); setQuery("") }} />}</div>
         </section>
         <aside className="space-y-6 xl:pt-1" aria-label="Intelligence highlights">
-          <div className="rounded-xl border border-[#e8ece7] bg-white p-5"><div className="flex items-center gap-2 text-[#5e8067]"><Sparkles className="size-4" /><span className="text-[11px] font-semibold uppercase tracking-[0.12em]">At a glance</span></div><div className="mt-5 grid grid-cols-2 gap-4"><Link href="/intelligence/news?priority=high" className="rounded-lg -m-2 p-2 transition-colors hover:bg-[#f2f6ef] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#54775d]" aria-label="View high priority updates"><div className="text-2xl font-semibold tracking-tight">{items.filter((item) => item.priority === "HIGH").length}</div><div className="mt-1 text-xs text-[#5e8067]">High priority →</div></Link><div><div className="text-2xl font-semibold tracking-tight">{opportunities}</div><div className="mt-1 text-xs text-[#89958a]">Opportunities</div></div></div><p className="mt-5 border-t border-[#eef1ed] pt-4 text-xs leading-5 text-[#91a096]">High priority combines importance and relevance. Source priority adjusts the threshold.</p></div>
+          <div className="rounded-xl border border-[#e8ece7] bg-white p-5"><div className="flex items-center gap-2 text-[#5e8067]"><Sparkles className="size-4" /><span className="text-[11px] font-semibold uppercase tracking-[0.12em]">At a glance</span></div><div className="mt-5 grid grid-cols-2 gap-4"><Link href="/intelligence/news?priority=high" className="rounded-lg -m-2 p-2 transition-colors hover:bg-[#f2f6ef] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#54775d]" aria-label="View high priority updates"><div className="text-2xl font-semibold tracking-tight">{items.filter((item) => item.priority === "HIGH").length}</div><div className="mt-1 text-xs text-[#5e8067]">High priority →</div></Link><div><div className="text-2xl font-semibold tracking-tight">{opportunities}</div><div className="mt-1 text-xs text-[#89958a]">Opportunities</div></div></div><p className="mt-5 border-t border-[#eef1ed] pt-4 text-xs leading-5 text-[#91a096]">Priority favors current grants and tenders for a Kosovo AI company. Check eligibility at the source.</p></div>
           {upcoming.length ? <div className="px-1"><div className="flex items-center justify-between"><h3 className="flex items-center gap-2 text-sm font-semibold"><CalendarDays className="size-4 text-[#7f9b85]" /> Dates to watch</h3>{isDemo ? <span className="text-[11px] text-[#a0aaa2]">Sample</span> : null}</div><div className="mt-4 space-y-0">{upcoming.map((item) => <div key={item.id} className="flex items-start gap-3 border-b border-[#e8ece7] py-3"><span className="min-w-11 text-xs font-semibold text-[#5d7964]">{new Date(`${item.analysis.deadline}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span><div className="min-w-0"><div className="text-xs font-medium leading-5 text-[#36473b]">{item.title}</div><div className="mt-0.5 text-[11px] text-[#9aa69c]">{item.sourceName}</div></div></div>)}</div></div> : null}
         </aside>
       </div>

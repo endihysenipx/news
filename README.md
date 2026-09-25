@@ -25,6 +25,8 @@ Run one backend worker because the five-minute scheduler lives in the API proces
 
 With OpenAI configured, the Overview page can generate a Strategic Brief from the latest saved analyses. Each live article also has a Deep analysis action with key points, business impact, suggested next steps, and questions to verify. Both actions run only when clicked and cache their results in the database; the brief updates when the set of recent articles changes or on a new UTC day. Existing imported articles can use these actions without being recollected. The AI output is based on saved source material, so verify consequential details at the original link.
 
+The company focus is a Kosovo business offering AI solutions. New AI analyses prioritize actionable grants and tenders, especially Kosovo calls, and explicitly flag unknown eligibility. Overview and High priority promote recent relevant calls ahead of broad policy news. Expired calls and beneficiary/result lists are not promoted as application opportunities. The Strategic Brief follows the same focus and regenerates when its prompt version changes.
+
 `NEWS_ENABLE_COLLECTION=true` starts scheduled source checks every five minutes. Each source's own interval determines whether a check actually runs. Set it to `false` while reviewing the imported snapshot without collecting new content.
 
 Website collection currently supports the KIESA and EU Digital URL shapes implemented in `backend/app/intelligence/website_adapter.py`. Other websites, Facebook pages, and arbitrary APIs can be added as sources but need a connector before they collect posts. LinkedIn needs the Bright Data token and public post availability depends on the provider.

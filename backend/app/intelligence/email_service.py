@@ -4,7 +4,7 @@ import asyncio
 import socket
 
 from app.intelligence.models import NewsAnalysis, NewsItem, NewsSource
-from app.intelligence.priority import news_priority
+from app.intelligence.priority import analyzed_news_priority
 from app.mail import GmailService
 from app.config import settings
 
@@ -18,7 +18,7 @@ def _clean(value: str) -> str:
 def news_email_content(item: NewsItem, source: NewsSource, analysis: NewsAnalysis) -> tuple[str, str]:
     title = _clean(item.title)
     subject = f"[News Intelligence] {title}"[:200]
-    priority = news_priority(source.priority, analysis.importance_score, analysis.relevance_score)
+    priority = analyzed_news_priority(item, source, analysis)
     lines = [title, "", f"{analysis.category.title()} · {priority.title()} priority", f"Source: {_clean(source.name)}"]
     if item.published_at:
         lines.append(f"Published: {item.published_at.date().isoformat()}")
