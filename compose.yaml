@@ -1,0 +1,46 @@
+services:
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: news
+      POSTGRES_USER: news
+      POSTGRES_PASSWORD: ${NEWS_DB_PASSWORD:?Set NEWS_DB_PASSWORD in news/.env}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - news_postgres:/var/lib/postgresql/data
+      - ./data:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U news -d news"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file: .env
+    environment:
+      NEWS_DATABASE_URL: postgresql+asyncpg://news:${NEWS_DB_PASSWORD}@database:5432/news
+    depends_on:
+      database:
+        condition: service_healthy
+    expose:
+      - "8001"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        NEWS_API_INTERNAL_URL: http://api:8001
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:3101:3101"
+    restart: unless-stopped
+
+volumes:
+  news_postgres:

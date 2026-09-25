@@ -1,0 +1,32 @@
+# News Intelligence
+
+This folder is a standalone application. It has its own Next.js frontend, FastAPI backend, PostgreSQL database, login, source polling, and optional OpenAI, Bright Data, and SMTP integrations. It does not call PrimeFlow at runtime.
+
+## What was moved
+
+- News feed, Overview, Opportunities, Saved, and admin Sources pages
+- KIESA and EU Digital website collectors, generic public RSS/Atom collector, and Bright Data LinkedIn post collector
+- Server-side AI analysis, source intervals, priority scoring, read and saved state, and optional email sharing
+- A snapshot of **77 collected articles and analyses** from PrimeFlow on 25 September 2026, plus **6 source records** in `data/primeflow-export.json`
+
+The five official source URLs and guidance were reconstructed from PrimeFlow's seed migrations. The LinkedIn profile URL came from the source previously provided by the user. Source settings that are not exposed by the feed API were reconstructed with normal priority and a 60 minute interval. The old app stored bookmarks in each browser's local storage; those browser-specific bookmarks and other users' read/email state are not in the export. Sources with no collected articles may also be absent. The new app stores new bookmarks and reading state in its own database.
+
+## Run locally or after copying the folder
+
+Copy the whole `news/` folder, including its hidden `.env` file. From inside it, run `docker compose up -d --build`, then open <http://localhost:3101>. Sign in with `NEWS_ADMIN_EMAIL` and `NEWS_ADMIN_PASSWORD` from `news/.env`. The current local copy already has generated credentials; a new copy made from Git needs `.env.example` copied to `.env` with private values filled in once.
+
+Docker starts the database, API, and web app. On a fresh database, PostgreSQL restores `data/01-current.sql` if present. Otherwise, the API imports the 77-article snapshot from `data/primeflow-export.json` once. Subsequent restarts preserve the database volume. The app does not need PrimeFlow, Python, or Node installed on the destination; Docker is enough.
+
+## Production configuration
+
+Run one backend worker because the five-minute scheduler lives in the API process. Use a dedicated PostgreSQL database, set `NEWS_COOKIE_SECURE=true` behind HTTPS, and set `NEWS_PUBLIC_ORIGIN` to the public frontend origin. The Docker build points the frontend's `/api` proxy at the bundled API. Keep `.env` out of source control; it is the single private file copied with the folder.
+
+`OPENAI_API_KEY` enables structured article analysis. `BRIGHTDATA_API_TOKEN` enables LinkedIn post checks. Website and RSS collection work without those credentials, with a basic fallback analysis when OpenAI is absent. `EMAIL_USER` and `EMAIL_PASSWORD` enable the Email button; the destination defaults to `180primex.eu@gmail.com`. The service checks Gmail SMTP port 587 and uses TLS port 465 if 587 cannot be reached. Email delivery still depends on outbound SMTP access from the new host.
+
+`NEWS_ENABLE_COLLECTION=true` starts scheduled source checks every five minutes. Each source's own interval determines whether a check actually runs. Set it to `false` while reviewing the imported snapshot without collecting new content.
+
+Website collection currently supports the KIESA and EU Digital URL shapes implemented in `backend/app/intelligence/website_adapter.py`. Other websites, Facebook pages, and arbitrary APIs can be added as sources but need a connector before they collect posts. LinkedIn needs the Bright Data token and public post availability depends on the provider.
+
+## Moving to another repository or server
+
+Before copying to another computer, run `./prepare-copy.ps1` in PowerShell from this folder. It saves the full current database to `data/01-current.sql` and stops the app. Copy the entire `news/` folder, including `.env` and `data/01-current.sql`, then run `docker compose up -d --build` at the destination. The database restore includes collected articles, sources, read state, and saved items. Restart the original copy with `docker compose up -d` if needed. No PrimeFlow deployment or database connection is needed. The local PrimeFlow checkout has had its News routes, navigation item, worker jobs, and module code removed. Historical PrimeFlow migrations and the original live tables remain for data safety until a separate verified cleanup is authorized and deployed.
