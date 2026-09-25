@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Bookmark, BriefcaseBusiness, ChevronRight, Compass, LayoutDashboard, LogOut, Menu, Newspaper, Radio, X } from "lucide-react"
+import { Bookmark, BriefcaseBusiness, ChevronRight, Compass, LayoutDashboard, LogOut, Menu, Newspaper, Radio, X, Zap } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 import { filters } from "@/features/intelligence/components/news-filters"
@@ -37,7 +37,8 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
 
   if (loading || !user) return <div className="flex min-h-screen items-center justify-center bg-[#f7f8f5] text-sm text-[#647369]">Loading workspace…</div>
 
-  const activeCategory = searchParams.get("category") || (pathname === "/intelligence" ? "For You" : pathname === "/intelligence/news" ? "All" : "")
+  const highPriorityActive = pathname === "/intelligence/news" && searchParams.get("priority") === "high"
+  const activeCategory = highPriorityActive ? "" : searchParams.get("category") || (pathname === "/intelligence" ? "For You" : pathname === "/intelligence/news" ? "All" : "")
 
   return <div className="min-h-screen bg-[#f7f8f5] text-[#24342a]">
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#e4e9e1] bg-white px-4 lg:hidden">
@@ -52,6 +53,9 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
         <nav aria-label="Workspace sections" className="mt-3 space-y-1">
           {sections.map(({ label, href, icon: Icon }) => <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} className={cn("group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#54775d]", pathname === href ? "bg-[#eaf1e9] text-[#214a31]" : "text-[#64746a] hover:bg-[#f5f7f3] hover:text-[#253c2c]")}><Icon className="size-[18px]" /><span className="flex-1">{label}</span>{pathname === href ? <ChevronRight className="size-3.5 text-[#668672]" /> : null}</Link>)}
         </nav>
+        <div className="my-6 border-t border-[#eef1ec]" />
+        <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#94a096]">Quick view</p>
+        <Link href="/intelligence/news?priority=high" aria-current={highPriorityActive ? "page" : undefined} className={cn("mt-3 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#54775d]", highPriorityActive ? "bg-[#eaf1e9] text-[#214a31]" : "text-[#64746a] hover:bg-[#f5f7f3] hover:text-[#253c2c]")}><Zap className="size-[18px]" /> High priority</Link>
         <div className="my-6 border-t border-[#eef1ec]" />
         <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#94a096]">Explore topics</p>
         <nav aria-label="News topics" className="mt-3 space-y-0.5">
