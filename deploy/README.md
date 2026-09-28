@@ -16,12 +16,17 @@ pool and the same host binding on port 80 as an origin fallback. Its root is
 `iis-proxy`, which proxies requests to the Next.js service. The other IIS
 sites and PostgreSQL databases are separate.
 
-Pushing to `main` runs `.github/workflows/deploy.yml` on the dedicated
-`news-intelligence` Windows runner. `deploy/deploy.ps1` builds the checkout in
-`_deploy\stage`, replaces only this application's `backend`, `frontend`, and
-`.venv` directories, then checks the API and web endpoints. It restores the
-previous directories if the health check fails. The two latest backups stay in
-`_deploy\backups`. The production `.env`, PostgreSQL database, `data` directory,
-IIS configuration, and Cloudflare route are outside the replacement set.
+Pushing to `main` runs `.github/workflows/deploy.yml` on GitHub Actions to
+verify the frontend build and backend syntax. The server task
+`NewsIntelligenceSync` checks the latest workflow result every five minutes.
+When the successful run matches the current `main` commit, `sync.ps1` fetches
+that commit and runs `deploy/deploy.ps1`. A failed workflow never deploys.
+
+`deploy/deploy.ps1` builds the checkout in `_deploy\stage`, replaces only this
+application's `backend`, `frontend`, and `.venv` directories, then checks the
+API and web endpoints. It restores the previous directories if the health
+check fails. The two latest backups stay in `_deploy\backups`. The production
+`.env`, PostgreSQL database, `data` directory, IIS configuration, and
+Cloudflare route are outside the replacement set.
 
 Cloudflare Tunnel manages the public DNS record and HTTPS endpoint.
