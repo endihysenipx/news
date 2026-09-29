@@ -29,7 +29,7 @@ The company focus is a Kosovo business offering AI solutions. New AI analyses pr
 
 `NEWS_ENABLE_COLLECTION=true` starts scheduled source checks every five minutes. Each source's own interval determines whether a check actually runs. Set it to `false` while reviewing the imported snapshot without collecting new content.
 
-Website collection currently supports the KIESA and EU Digital URL shapes implemented in `backend/app/intelligence/website_adapter.py`. Other websites, Facebook pages, and arbitrary APIs can be added as sources but need a connector before they collect posts. LinkedIn needs the Bright Data token and public post availability depends on the provider.
+Website collection keeps dedicated KIESA and EU Digital extractors and now also attempts public websites without RSS through a generic collector. The generic collector discovers same-site article links, advertised RSS/Atom feeds, and sitemap entries; it reads HTML and text PDFs. If the initial page has no useful links, Chromium renders JavaScript as a fallback. Sources that require sign-in or block automated requests may report a check error. Select source categories such as Grants to keep unrelated new items out of the feed. Facebook pages and arbitrary APIs still need a connector. LinkedIn needs the Bright Data token and public post availability depends on the provider.
 
 ## Moving to another repository or server
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
 import httpx
 
@@ -34,8 +35,16 @@ ANALYSIS_SCHEMA = {
 
 
 def fallback_analysis(item: CollectedNewsItem, source: NewsSource) -> StructuredNewsAnalysis:
+    title = item.title.lower()
+    result_notice = re.search(r"beneficiar|p[eë]rfitues|results?|winners?|awarded|lista", title)
+    category = "NEWS"
+    if not result_notice:
+        if re.search(r"grant|grante|subvenc|funding call|call for proposals|thirrje p[eë]r aplik", title):
+            category = "GRANT"
+        elif re.search(r"tender|procure|prokurim", title):
+            category = "TENDER"
     return StructuredNewsAnalysis(
-        summary=(item.original_text or item.title)[:500], category="NEWS",
+        summary=(item.original_text or item.title)[:500], category=category,
         importanceScore={"HIGH": 80, "NORMAL": 55, "LOW": 35}.get(source.priority, 55),
         relevanceScore=70 if source.priority != "LOW" else 50,
         tags=list(source.categories),

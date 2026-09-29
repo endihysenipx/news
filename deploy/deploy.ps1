@@ -107,6 +107,8 @@ try {
     Invoke-Checked (Join-Path $stage '.venv\Scripts\python.exe') @(
         '-m', 'pip', 'install', '--disable-pip-version-check', '-r', (Join-Path $stage 'backend\requirements.txt')
     ) $stage
+    $env:PLAYWRIGHT_BROWSERS_PATH = '0'
+    Invoke-Checked (Join-Path $stage '.venv\Scripts\python.exe') @('-m', 'playwright', 'install', 'chromium') $stage
 
     $env:NEWS_API_INTERNAL_URL = 'http://127.0.0.1:8001'
     Invoke-Checked $npm @('ci', '--no-audit', '--no-fund') (Join-Path $stage 'frontend')

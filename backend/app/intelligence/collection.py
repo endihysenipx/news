@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db import SessionLocal
 from app.intelligence.ai_service import analyze_news_item
+from app.intelligence.generic_website_adapter import GenericWebsiteAdapter
 from app.intelligence.linkedin_adapter import BrightDataLinkedInAdapter, LinkedInCollectionError
 from app.intelligence.models import NewsAnalysis, NewsItem, NewsSource
 from app.intelligence.rss_adapter import RSSAdapter, RSSCollectionError, rss_url_is_supported
@@ -22,6 +23,17 @@ from app.intelligence.website_adapter import OfficialWebsiteAdapter, WebsiteColl
 
 logger = logging.getLogger(__name__)
 INITIAL_LOOKBACK_DAYS = 60
+CATEGORY_SELECTION = {
+    "GRANT": {"Grants", "Funding"}, "TENDER": {"Tenders"},
+    "BUSINESS": {"Business"}, "EVENT": {"Events"},
+    "TECHNOLOGY": {"Technology"}, "REGULATION": {"Regulations"},
+    "PARTNERSHIP": {"Partnerships"}, "NEWS": {"General News"},
+}
+
+
+def category_allowed(selected_categories: list[str], category: str) -> bool:
+    selected = set(selected_categories)
+    return not selected or "General News" in selected or bool(selected.intersection(CATEGORY_SELECTION.get(category, set())))
 
 
 def linkedin_configured() -> bool:
@@ -43,6 +55,8 @@ async def _store_post(db: AsyncSession, source: NewsSource, post: CollectedNewsI
     if exists:
         return False
     analysis = await analyze_news_item(post, source)
+    if not category_allowed(source.categories or [], analysis.category):
+        return False
     item = NewsItem(
         source_id=source.id, external_id=post.external_id, url=post.url,
         title=post.title, original_text=post.original_text,
@@ -70,6 +84,15 @@ async def _check_website_source(db: AsyncSession, source: NewsSource, now: datet
     minimum_interval = 5 if force else source.fetch_interval_minutes
     if source.last_started_at and source.last_started_at > now - timedelta(minutes=minimum_interval):
         return "pending"
+    if source_kind(source.url) is None:
+        posts = await GenericWebsiteAdapter(source.url).collect()
+        for post in posts:
+            await _store_post(db, source, post)
+        source.last_started_at = now
+        source.last_checked_at = now
+        source.last_error = None
+        await db.commit()
+        return "completed"
     adapter = OfficialWebsiteAdapter(source.url)
     cutoff = now - timedelta(days=60)
     async with adapter._client() as client:
@@ -119,7 +142,7 @@ async def check_source(db: AsyncSession, source_id: uuid.UUID, *, force: bool = 
     )).scalar_one_or_none()
     if source is None:
         return "pending"
-    if source.type not in {"LINKEDIN", "WEBSITE", "RSS"} or (source.type == "WEBSITE" and not source_kind(source.url)) or (source.type == "RSS" and not rss_url_is_supported(source.url)):
+    if source.type not in {"LINKEDIN", "WEBSITE", "RSS"} or (source.type == "WEBSITE" and not rss_url_is_supported(source.url)) or (source.type == "RSS" and not rss_url_is_supported(source.url)):
         raise LinkedInCollectionError("No collector is available for this source URL yet.")
     if source.status != "ACTIVE":
         raise LinkedInCollectionError("Activate this source before checking it.")
@@ -191,7 +214,7 @@ async def check_due_sources() -> dict[str, int]:
         ))).scalars().all())
     ids = [source.id for source in sources if
            (source.type == "LINKEDIN" and linkedin_configured()) or
-           (source.type == "WEBSITE" and source_kind(source.url)) or
+           (source.type == "WEBSITE" and rss_url_is_supported(source.url)) or
            (source.type == "RSS" and rss_url_is_supported(source.url))]
     checked = 0
     for source_id in ids:
