@@ -16,14 +16,14 @@ const sourceTypes: { value: SourceType; label: string }[] = [
 ]
 
 const blankSource: NewsSourceInput = {
-  name: "", url: "", type: "WEBSITE", status: "ACTIVE", priority: "NORMAL", categories: [], ai_instructions: "", fetch_interval_minutes: 60,
+  name: "", url: "", type: "WEBSITE", status: "ACTIVE", priority: "NORMAL", categories: [], ai_instructions: "", fetch_interval_minutes: 60, email_enabled: false,
 }
 
 export function toSourceInput(source: NewsSource): NewsSourceInput {
   return {
     name: source.name, url: source.url, type: source.type, status: source.status,
     priority: source.priority, categories: [...source.categories],
-    ai_instructions: source.ai_instructions, fetch_interval_minutes: source.fetch_interval_minutes,
+    ai_instructions: source.ai_instructions, fetch_interval_minutes: source.fetch_interval_minutes, email_enabled: source.email_enabled,
   }
 }
 
@@ -52,6 +52,7 @@ export function SourceForm({ open, source, onOpenChange, onSave }: { open: boole
       <div className="space-y-1.5"><Label>Priority</Label><Select value={form.priority} onValueChange={(value) => update("priority", value as SourcePriority)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="HIGH">High</SelectItem><SelectItem value="NORMAL">Normal</SelectItem><SelectItem value="LOW">Low</SelectItem></SelectContent></Select></div></div>
       <fieldset><legend className="text-sm font-medium">Show only these categories</legend><p className="mt-1 text-xs text-muted-foreground">For example, select Grants to keep other news from this source out of your feed. Leave empty to show everything.</p><div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-3 rounded-lg bg-[#f7f9f6] p-4 sm:grid-cols-3">{categories.map((category) => <label key={category} className="flex cursor-pointer items-center gap-2 text-xs text-[#4e6053]"><Checkbox checked={form.categories.includes(category)} onCheckedChange={(checked) => update("categories", checked ? [...form.categories, category] : form.categories.filter((value) => value !== category))} />{category}</label>)}</div></fieldset>
       <div className="space-y-1.5"><Label htmlFor="source-ai">AI instructions</Label><Textarea id="source-ai" value={form.ai_instructions || ""} onChange={(event) => update("ai_instructions", event.target.value)} maxLength={4000} rows={3} placeholder="Prioritize grants, tenders and opportunities relevant to Kosovo technology companies." /><p className="text-xs text-muted-foreground">Used when new updates from connected sources are analyzed on the server.</p></div>
+      <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[#e5eae4] bg-[#f7f9f6] p-4"><Checkbox checked={form.email_enabled} onCheckedChange={(checked) => update("email_enabled", checked === true)} aria-label="Send new updates from this source by email" /><span><span className="block text-sm font-medium">Send new updates from this source by email</span><span className="mt-1 block text-xs text-muted-foreground">Include new updates in the combined report at your scheduled times. Updates already collected are not sent.</span></span></label>
       <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-1.5"><Label>Status</Label><Select value={form.status} onValueChange={(value) => update("status", value as SourceStatus)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ACTIVE">Active</SelectItem><SelectItem value="PAUSED">Paused</SelectItem></SelectContent></Select></div><div className="space-y-1.5"><Label htmlFor="source-interval">Check interval · minutes</Label><Input id="source-interval" type="number" min={5} max={10080} value={form.fetch_interval_minutes} onChange={(event) => update("fetch_interval_minutes", Number(event.target.value))} required /></div></div>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
       <DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving…" : source ? "Save changes" : "Add source"}</Button></DialogFooter>

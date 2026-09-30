@@ -77,3 +77,29 @@ class NewsUserState(Base):
     emailed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     saved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     hidden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class NewsDigestSettings(Base):
+    __tablename__ = "intelligence_digest_settings"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    times: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=lambda: ["12:30", "17:00", "21:00"])
+    last_slot_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now())
+    last_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(String(500))
+
+
+class NewsSourceEmailSubscription(Base):
+    __tablename__ = "intelligence_source_email_subscriptions"
+
+    source_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("intelligence_sources.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    enabled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class NewsDigestDelivery(Base):
+    __tablename__ = "intelligence_digest_deliveries"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    url_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

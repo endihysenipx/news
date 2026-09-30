@@ -13,7 +13,9 @@ from app.db import AppMetadata, Base, SessionLocal, engine
 from app.import_primeflow import import_export
 from app.intelligence import models  # noqa: F401 - registers isolated tables
 from app.intelligence.collection import check_due_sources
+from app.intelligence.digest_service import run_digest_cycle
 from app.intelligence.router import router as intelligence_router
+from app.intelligence.digest_router import router as digest_router
 
 
 @asynccontextmanager
@@ -29,7 +31,8 @@ async def lifespan(_: FastAPI):
     scheduler = AsyncIOScheduler(timezone="UTC")
     if settings.NEWS_ENABLE_COLLECTION:
         scheduler.add_job(check_due_sources, "interval", minutes=5, next_run_time=datetime.now(timezone.utc), max_instances=1)
-        scheduler.start()
+    scheduler.add_job(run_digest_cycle, "interval", minutes=1, next_run_time=datetime.now(timezone.utc), max_instances=1)
+    scheduler.start()
     try:
         yield
     finally:
@@ -48,6 +51,7 @@ app.add_middleware(
 )
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(intelligence_router, prefix="/api/intelligence", tags=["intelligence"])
+app.include_router(digest_router, prefix="/api/intelligence", tags=["email"])
 
 
 @app.get("/api/health")

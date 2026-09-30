@@ -4,8 +4,9 @@ import logging
 import smtplib
 import asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import and_, func, select, update
@@ -14,20 +15,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import User, get_current_user, require_admin
 from app.config import settings
-from app.db import get_db
+from app.db import SessionLocal, get_db
 from app.intelligence.collection import check_source, linkedin_configured
 from app.intelligence.email_service import INTELLIGENCE_RECIPIENT, send_news_email
 from app.intelligence.focus import opportunity_focus_score
 from app.intelligence.insights import InsightGenerationError, cached_brief, deep_insight, strategic_brief
 from app.intelligence.linkedin_adapter import LinkedInCollectionError
-from app.intelligence.models import NewsAnalysis, NewsItem, NewsSource, NewsUserState
+from app.intelligence.models import NewsAnalysis, NewsItem, NewsSource, NewsSourceEmailSubscription, NewsUserState
 from app.intelligence.priority import analyzed_news_priority
 from app.intelligence.rss_adapter import rss_url_is_supported
-from app.intelligence.schemas import DeepInsightOut, EmailShareOut, IntelligenceStatusOut, NewsFeedOut, NewsSourceCreate, NewsSourceOut, NewsSourceUpdate, SourceCheckOut, StrategicBriefOut
+from app.intelligence.schemas import DeepInsightOut, EmailShareOut, IntelligenceStatusOut, NewsFeedOut, NewsSourceCreate, NewsSourceEmailInput, NewsSourceOut, NewsSourceUpdate, SourceCheckOut, StrategicBriefOut
 from app.intelligence.website_adapter import source_kind
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+_check_all_lock = asyncio.Lock()
+_check_all_task: asyncio.Task[None] | None = None
+_check_all_status: dict[str, object] = {"state": "idle", "total": 0, "processed": 0, "failed": 0, "started": 0, "pending": 0}
 
 
 async def _check_source_background(source_id: uuid.UUID) -> None:
@@ -40,9 +44,31 @@ async def _check_source_background(source_id: uuid.UUID) -> None:
         logger.exception("Manual source check failed for %s", source_id)
 
 
-def _source_out(source: NewsSource) -> NewsSourceOut:
+async def _check_all_sources(source_ids: list[uuid.UUID]) -> None:
+    try:
+        for source_id in source_ids:
+            try:
+                async with SessionLocal() as session:
+                    result = await check_source(session, source_id, force=True)
+                if result == "error":
+                    _check_all_status["failed"] = int(_check_all_status["failed"]) + 1
+                elif result == "started":
+                    _check_all_status["started"] = int(_check_all_status["started"]) + 1
+                elif result == "pending":
+                    _check_all_status["pending"] = int(_check_all_status["pending"]) + 1
+            except Exception:
+                _check_all_status["failed"] = int(_check_all_status["failed"]) + 1
+                logger.exception("Manual source check failed for %s", source_id)
+            finally:
+                _check_all_status["processed"] = int(_check_all_status["processed"]) + 1
+    finally:
+        _check_all_status["state"] = "finished"
+
+
+def _source_out(source: NewsSource, email_enabled: bool = False) -> NewsSourceOut:
     output = NewsSourceOut.model_validate(source)
     output.collection_supported = source.type == "LINKEDIN" or (source.type in {"WEBSITE", "RSS"} and rss_url_is_supported(source.url))
+    output.email_enabled = email_enabled
     return output
 
 
@@ -54,6 +80,7 @@ async def intelligence_status(_: User = Depends(require_admin)) -> IntelligenceS
 @router.get("/items", response_model=NewsFeedOut)
 async def list_items(
     read_state: Literal["all", "unread", "read"] = "all",
+    due_soon: bool = False,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> NewsFeedOut:
@@ -76,8 +103,13 @@ async def list_items(
         query = query.where(NewsUserState.read_at.is_(None))
     elif read_state == "read":
         query = query.where(NewsUserState.read_at.is_not(None))
+    if due_soon:
+        today = datetime.now(ZoneInfo("Europe/Budapest")).date()
+        query = query.where(NewsAnalysis.category.in_(["GRANT", "TENDER", "BUSINESS", "PARTNERSHIP"]),
+                            NewsAnalysis.deadline.between(today, today + timedelta(days=30)))
+        query = query.order_by(None).order_by(NewsAnalysis.deadline.asc(), NewsItem.published_at.desc())
     rows = (await db.execute(query)).all()
-    return NewsFeedOut(hasLiveSources=has_live_sources, emailConfigured=bool(settings.EMAIL_USER and settings.EMAIL_PASSWORD), aiConfigured=bool(settings.OPENAI_API_KEY), items=[{
+    return NewsFeedOut(hasLiveSources=has_live_sources, emailConfigured=bool(settings.EMAIL_USER and settings.EMAIL_PASSWORD), emailRecipient=settings.NEWS_EMAIL_RECIPIENT, aiConfigured=bool(settings.OPENAI_API_KEY), items=[{
         "id": str(item.id), "sourceId": str(source.id), "sourceName": source.name,
         "sourceType": source.type, "externalId": item.external_id,
         "url": item.url, "title": item.title, "originalText": item.original_text,
@@ -273,20 +305,49 @@ async def unsave_item(
 
 
 @router.get("/sources", response_model=list[NewsSourceOut])
-async def list_sources(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)) -> list[NewsSourceOut]:
+async def list_sources(db: AsyncSession = Depends(get_db), user: User = Depends(require_admin)) -> list[NewsSourceOut]:
     sources = (await db.execute(select(NewsSource).order_by(NewsSource.created_at.desc()))).scalars().all()
-    return [_source_out(source) for source in sources]
+    subscribed = set((await db.scalars(select(NewsSourceEmailSubscription.source_id).where(
+        NewsSourceEmailSubscription.user_id == user.id))).all())
+    return [_source_out(source, source.id in subscribed) for source in sources]
+
+
+@router.get("/sources/check-all/status")
+async def check_all_sources_status(_: User = Depends(require_admin)) -> dict[str, object]:
+    return _check_all_status.copy()
+
+
+@router.post("/sources/check-all")
+async def check_all_sources_now(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)) -> dict[str, object]:
+    global _check_all_task, _check_all_status
+    async with _check_all_lock:
+        if _check_all_task and not _check_all_task.done():
+            return _check_all_status.copy()
+        sources = (await db.execute(select(NewsSource).where(NewsSource.status == "ACTIVE"))).scalars().all()
+        source_ids = [source.id for source in sources if
+                      (source.type in {"WEBSITE", "RSS"} and rss_url_is_supported(source.url)) or
+                      (source.type == "LINKEDIN" and linkedin_configured())]
+        if not source_ids:
+            raise HTTPException(status_code=409, detail="No active, connected sources are available to check.")
+        _check_all_status = {"state": "running", "total": len(source_ids), "processed": 0, "failed": 0, "started": 0, "pending": 0}
+        _check_all_task = asyncio.create_task(_check_all_sources(source_ids))
+        return _check_all_status.copy()
 
 
 @router.post("/sources", response_model=NewsSourceOut, status_code=status.HTTP_201_CREATED)
-async def create_source(payload: NewsSourceCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)) -> NewsSourceOut:
+async def create_source(payload: NewsSourceCreate, db: AsyncSession = Depends(get_db), user: User = Depends(require_admin)) -> NewsSourceOut:
     if payload.type in {"RSS", "WEBSITE"} and not rss_url_is_supported(payload.url):
         raise HTTPException(status_code=422, detail="Use a public HTTP or HTTPS URL without credentials or a custom port.")
-    source = NewsSource(**payload.model_dump())
+    source = NewsSource(**payload.model_dump(exclude={"email_enabled"}))
     db.add(source)
+    await db.flush()
+    if payload.email_enabled:
+        from app.intelligence.digest_service import ensure_digest_settings
+        await ensure_digest_settings(db, user.id)
+        db.add(NewsSourceEmailSubscription(source_id=source.id, user_id=user.id, enabled_at=datetime.now(timezone.utc)))
     await db.commit()
     await db.refresh(source)
-    return _source_out(source)
+    return _source_out(source, payload.email_enabled)
 
 
 async def _get_source(db: AsyncSession, source_id: uuid.UUID) -> NewsSource:
@@ -324,20 +385,48 @@ async def check_source_now(source_id: uuid.UUID, db: AsyncSession = Depends(get_
 
 
 @router.put("/sources/{source_id}", response_model=NewsSourceOut)
-async def update_source(source_id: uuid.UUID, payload: NewsSourceUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)) -> NewsSourceOut:
+async def update_source(source_id: uuid.UUID, payload: NewsSourceUpdate, db: AsyncSession = Depends(get_db), user: User = Depends(require_admin)) -> NewsSourceOut:
     if payload.type in {"RSS", "WEBSITE"} and not rss_url_is_supported(payload.url):
         raise HTTPException(status_code=422, detail="Use a public HTTP or HTTPS URL without credentials or a custom port.")
     source = await _get_source(db, source_id)
+    source_changed = source.url != payload.url or source.type != payload.type or source.status != payload.status
     if source.url != payload.url or source.type != payload.type:
         source.pending_snapshot_id = None
         source.last_started_at = None
         source.last_checked_at = None
         source.last_error = None
-    for field, value in payload.model_dump().items():
+    for field, value in payload.model_dump(exclude={"email_enabled"}).items():
         setattr(source, field, value)
+    subscription = await db.get(NewsSourceEmailSubscription, source_id)
+    if subscription is not None and subscription.user_id != user.id:
+        raise HTTPException(status_code=409, detail="Email updates for this source are managed by another administrator.")
+    if payload.email_enabled and subscription is None:
+        from app.intelligence.digest_service import ensure_digest_settings
+        await ensure_digest_settings(db, user.id)
+        db.add(NewsSourceEmailSubscription(source_id=source_id, user_id=user.id, enabled_at=datetime.now(timezone.utc)))
+    elif not payload.email_enabled and subscription is not None and subscription.user_id == user.id:
+        await db.delete(subscription)
+    elif payload.email_enabled and subscription is not None and source_changed:
+        subscription.enabled_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(source)
-    return _source_out(source)
+    return _source_out(source, payload.email_enabled)
+
+
+@router.put("/sources/{source_id}/email", response_model=NewsSourceOut)
+async def set_source_email(source_id: uuid.UUID, payload: NewsSourceEmailInput, db: AsyncSession = Depends(get_db), user: User = Depends(require_admin)) -> NewsSourceOut:
+    source = await _get_source(db, source_id)
+    subscription = await db.get(NewsSourceEmailSubscription, source_id)
+    if subscription is not None and subscription.user_id != user.id:
+        raise HTTPException(status_code=409, detail="Email updates for this source are managed by another administrator.")
+    if payload.enabled and subscription is None:
+        from app.intelligence.digest_service import ensure_digest_settings
+        await ensure_digest_settings(db, user.id)
+        db.add(NewsSourceEmailSubscription(source_id=source_id, user_id=user.id, enabled_at=datetime.now(timezone.utc)))
+    elif not payload.enabled and subscription is not None and subscription.user_id == user.id:
+        await db.delete(subscription)
+    await db.commit()
+    return _source_out(source, payload.enabled)
 
 
 @router.delete("/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT)

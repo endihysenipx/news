@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Bookmark, BriefcaseBusiness, ChevronRight, Compass, LayoutDashboard, LogOut, Menu, Newspaper, Radio, X, Zap } from "lucide-react"
+import { Bookmark, BriefcaseBusiness, ChevronRight, Compass, LayoutDashboard, LogOut, Mail, Menu, Newspaper, Radio, X, Zap } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 import { filters } from "@/features/intelligence/components/news-filters"
@@ -13,6 +13,7 @@ const sections = [
   { label: "News", href: "/intelligence/news", icon: Newspaper },
   { label: "Opportunities", href: "/intelligence/opportunities", icon: BriefcaseBusiness },
   { label: "Saved", href: "/intelligence/saved", icon: Bookmark },
+  { label: "Email settings", href: "/intelligence/email-settings", icon: Mail },
 ]
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {

@@ -58,7 +58,7 @@ def test_email_uses_existing_smtp_service_and_fixed_recipient(monkeypatch):
     send_verified.assert_awaited_once()
     subject, recipients, body = send_verified.await_args.args
     assert subject.startswith("[News Intelligence]")
-    assert recipients == [INTELLIGENCE_RECIPIENT] == ["180primex.eu@gmail.com"]
+    assert recipients == [INTELLIGENCE_RECIPIENT]
     assert "https://example.org/grants/123" in body
 
 

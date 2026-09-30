@@ -84,8 +84,18 @@ export interface NewsSource {
   pending_snapshot_id: string | null
   last_error: string | null
   collection_supported: boolean
+  email_enabled: boolean
   created_at: string
   updated_at: string
 }
 
-export type NewsSourceInput = Pick<NewsSource, "name" | "url" | "type" | "status" | "priority" | "categories" | "ai_instructions" | "fetch_interval_minutes">
+export type NewsSourceInput = Pick<NewsSource, "name" | "url" | "type" | "status" | "priority" | "categories" | "ai_instructions" | "fetch_interval_minutes" | "email_enabled">
+
+export interface DigestSettings {
+  times: string[]
+  timezone: string
+  recipient: string
+  lastSentAt: string | null
+  lastError: string | null
+  emailConfigured: boolean
+}

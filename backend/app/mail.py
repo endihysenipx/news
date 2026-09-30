@@ -17,12 +17,14 @@ class GmailService:
         self.host = settings.EMAIL_HOST
         self.port = settings.EMAIL_PORT
 
-    async def send_verified(self, subject: str, recipients: list[str], body: str) -> None:
+    async def send_verified(self, subject: str, recipients: list[str], body: str, html: str | None = None) -> None:
         message = EmailMessage()
         message["From"] = self.sender
         message["To"] = ", ".join(recipients)
         message["Subject"] = subject
         message.set_content(body, charset="utf-8")
+        if html:
+            message.add_alternative(html, subtype="html", charset="utf-8")
 
         def send() -> None:
             context = ssl.create_default_context()

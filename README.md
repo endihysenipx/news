@@ -2,6 +2,10 @@
 
 This folder is a standalone application. It has its own Next.js frontend, FastAPI backend, PostgreSQL database, login, source polling, and optional OpenAI, Bright Data, and SMTP integrations. It does not call PrimeFlow at runtime.
 
+## Email reports
+
+Each news source has an Email on/off choice. Enabled sources are combined into one structured email at each configured report time (12:30, 17:00, and 21:00 Europe/Budapest by default). Each report includes only updates discovered after email was enabled and not already delivered; the same article appears once even if several sources contain it. Empty reports are not sent. Report times are editable on the Email settings page. Delivery requires `EMAIL_USER` and `EMAIL_PASSWORD`, and the recipient is `NEWS_EMAIL_RECIPIENT`. Source checks run automatically when `NEWS_ENABLE_COLLECTION=true`; the report scheduler runs every minute when the API is running. A manual **Check now** action is also available. Report settings and delivery history are stored in PostgreSQL; fresh installations create their tables at startup.
+
 ## What was moved
 
 - News feed, Overview, Opportunities, Saved, and admin Sources pages
@@ -21,7 +25,7 @@ Docker starts the database, API, and web app. On a fresh database, PostgreSQL re
 
 Run one backend worker because the five-minute scheduler lives in the API process. Use a dedicated PostgreSQL database, set `NEWS_COOKIE_SECURE=true` behind HTTPS, and set `NEWS_PUBLIC_ORIGIN` to the public frontend origin. The Docker build points the frontend's `/api` proxy at the bundled API. Keep `.env` out of source control; it is the single private file copied with the folder.
 
-`OPENAI_API_KEY` enables structured article analysis. `BRIGHTDATA_API_TOKEN` enables LinkedIn post checks. Website and RSS collection work without those credentials, with a basic fallback analysis when OpenAI is absent. `EMAIL_USER` and `EMAIL_PASSWORD` enable the Email button; the destination defaults to `180primex.eu@gmail.com`. The service checks Gmail SMTP port 587 and uses TLS port 465 if 587 cannot be reached. Email delivery still depends on outbound SMTP access from the new host.
+`OPENAI_API_KEY` enables structured article analysis. `BRIGHTDATA_API_TOKEN` enables LinkedIn post checks. Website and RSS collection work without those credentials, with a basic fallback analysis when OpenAI is absent. `EMAIL_USER` and `EMAIL_PASSWORD` enable email delivery; set `NEWS_EMAIL_RECIPIENT` to the intended destination. The service checks Gmail SMTP port 587 and uses TLS port 465 if 587 cannot be reached. Email delivery still depends on outbound SMTP access from the new host.
 
 With OpenAI configured, the Overview page can generate a Strategic Brief from the latest saved analyses. Each live article also has a Deep analysis action with key points, business impact, suggested next steps, and questions to verify. Both actions run only when clicked and cache their results in the database; the brief updates when the set of recent articles changes or on a new UTC day. Existing imported articles can use these actions without being recollected. The AI output is based on saved source material, so verify consequential details at the original link.
 

@@ -1,17 +1,17 @@
 import { demoBrief, demoNews } from "./news.mock"
 import type { DailyBrief, NewsEntry } from "../types"
 
-export interface IntelligenceFeed { items: NewsEntry[]; isDemo: boolean; brief: DailyBrief | null; emailConfigured: boolean; aiConfigured: boolean }
+export interface IntelligenceFeed { items: NewsEntry[]; isDemo: boolean; brief: DailyBrief | null; emailConfigured: boolean; emailRecipient: string; aiConfigured: boolean }
 export type ReadState = "all" | "unread" | "read"
-export interface IntelligenceFeedService { getFeed(apiFetch: (path: string) => Promise<Response>, readState?: ReadState): Promise<IntelligenceFeed> }
+export interface IntelligenceFeedService { getFeed(apiFetch: (path: string) => Promise<Response>, readState?: ReadState, dueSoon?: boolean): Promise<IntelligenceFeed> }
 
 export const intelligenceFeedService: IntelligenceFeedService = {
-  async getFeed(apiFetch, readState = "all") {
-    const response = await apiFetch(`/intelligence/items?read_state=${readState}`)
+  async getFeed(apiFetch, readState = "all", dueSoon = false) {
+    const response = await apiFetch(`/intelligence/items?read_state=${readState}${dueSoon ? "&due_soon=true" : ""}`)
     if (!response.ok) throw new Error("Could not load intelligence updates.")
-    const payload = await response.json() as { items: NewsEntry[]; hasLiveSources: boolean; emailConfigured: boolean; aiConfigured: boolean }
+    const payload = await response.json() as { items: NewsEntry[]; hasLiveSources: boolean; emailConfigured: boolean; emailRecipient: string; aiConfigured: boolean }
     return payload.hasLiveSources
-      ? { items: payload.items, isDemo: false, brief: null, emailConfigured: payload.emailConfigured, aiConfigured: payload.aiConfigured }
-      : { items: demoNews, isDemo: true, brief: demoBrief, emailConfigured: false, aiConfigured: false }
+      ? { items: payload.items, isDemo: false, brief: null, emailConfigured: payload.emailConfigured, emailRecipient: payload.emailRecipient, aiConfigured: payload.aiConfigured }
+      : { items: demoNews, isDemo: true, brief: demoBrief, emailConfigured: false, emailRecipient: "", aiConfigured: false }
   },
 }

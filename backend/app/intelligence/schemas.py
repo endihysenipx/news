@@ -23,6 +23,7 @@ class NewsSourceCreate(BaseModel):
     categories: list[SourceCategory] = Field(default_factory=list, max_length=9)
     ai_instructions: str | None = Field(default=None, max_length=4000)
     fetch_interval_minutes: int = Field(default=60, ge=5, le=10080)
+    email_enabled: bool = False
 
     @field_validator("name", "url")
     @classmethod
@@ -54,6 +55,10 @@ class NewsSourceUpdate(NewsSourceCreate):
     pass
 
 
+class NewsSourceEmailInput(BaseModel):
+    enabled: bool
+
+
 class NewsSourceOut(BaseModel):
     id: uuid.UUID
     name: str
@@ -69,6 +74,7 @@ class NewsSourceOut(BaseModel):
     pending_snapshot_id: str | None
     last_error: str | None
     collection_supported: bool = False
+    email_enabled: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -133,6 +139,7 @@ class NewsFeedOut(BaseModel):
     items: list[FeedItemOut]
     hasLiveSources: bool
     emailConfigured: bool
+    emailRecipient: str
     aiConfigured: bool
 
 
@@ -171,3 +178,17 @@ class EmailShareOut(BaseModel):
 
 class SourceCheckOut(BaseModel):
     state: Literal["started", "pending", "completed", "error", "unavailable"]
+
+
+class DigestSettingsInput(BaseModel):
+    times: list[str] = Field(min_length=1, max_length=8)
+
+    @field_validator("times")
+    @classmethod
+    def valid_times(cls, values: list[str]) -> list[str]:
+        import re
+        if any(not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", value) for value in values):
+            raise ValueError("Use HH:MM times in 24-hour format")
+        if len(set(values)) != len(values):
+            raise ValueError("Times must be unique")
+        return sorted(values)
