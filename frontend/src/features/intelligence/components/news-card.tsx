@@ -1,15 +1,16 @@
 import { ArrowUpRight, Bookmark, CalendarDays, Check, CircleDollarSign, LoaderCircle, Mail, MapPin, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import type { NewsEntry } from "../types"
+import type { NewsEntry, RepostGroup } from "../types"
 import { DeepInsightAction } from "./deep-insight"
+import { LinkedInActivity } from "./linkedin-activity"
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" })
 const categoryLabels: Record<NewsEntry["analysis"]["category"], string> = {
   GRANT: "Grant", TENDER: "Tender", BUSINESS: "Business", TECHNOLOGY: "AI & Tech", EVENT: "Event", REGULATION: "Regulation", PARTNERSHIP: "Partnership", NEWS: "News",
 }
 
-export function NewsCard({ item, saved, read, canEmail, emailRecipient, canAnalyze, apiFetch, emailSending, emailBusy, onToggleSaved, onSetRead, onEmail }: { item: NewsEntry; saved: boolean; read: boolean; canEmail: boolean; emailRecipient: string; canAnalyze: boolean; apiFetch: (path: string, init?: RequestInit) => Promise<Response>; emailSending: boolean; emailBusy: boolean; onToggleSaved: (id: string) => void; onSetRead: (id: string, read: boolean) => void; onEmail: (id: string) => void }) {
+export function NewsCard({ item, repostGroup, saved, read, canEmail, emailRecipient, canAnalyze, apiFetch, emailSending, emailBusy, onToggleSaved, onSetRead, onEmail }: { item: NewsEntry; repostGroup?: RepostGroup; saved: boolean; read: boolean; canEmail: boolean; emailRecipient: string; canAnalyze: boolean; apiFetch: (path: string, init?: RequestInit) => Promise<Response>; emailSending: boolean; emailBusy: boolean; onToggleSaved: (id: string) => void; onSetRead: (id: string, read: boolean) => void; onEmail: (id: string) => void }) {
   const analysis = item.analysis
   const isOpportunity = analysis.category === "GRANT" || analysis.category === "TENDER"
   const markFromLink = () => { if (!read) onSetRead(item.id, true) }
@@ -37,6 +38,8 @@ export function NewsCard({ item, saved, read, canEmail, emailRecipient, canAnaly
         </div>
       ) : analysis.deadline ? <div className="mt-4 flex items-center gap-1.5 text-xs text-[#687b6d]"><CalendarDays className="size-3.5" /> Event date · {dateFormat.format(new Date(`${analysis.deadline}T12:00:00`))}</div> : null}
       {analysis.whyItMatters ? <div className="mt-4 border-l-2 border-[#b4c6b8] pl-3.5"><span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#52705d]">Why this matters</span><p className="mt-1 text-[13px] leading-5 text-[#506157]">{analysis.whyItMatters}</p></div> : null}
+      {repostGroup && item.repostGuidance?.[repostGroup] ? <details className="mt-4 rounded-lg bg-[#f6f8f5] p-3 text-xs text-[#68776b]"><summary className="cursor-pointer font-medium">{repostGroup === "CEO" ? "CEO" : "Company"} interaction guidance</summary><p className="mt-2 leading-5">{item.repostGuidance[repostGroup]}</p></details> : null}
+      {item.linkedin ? <LinkedInActivity activity={item.linkedin} /> : null}
       <div className="mt-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-t border-[#eef0ed] pt-4">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#858e88]"><span className="font-medium text-[#55645a]">{item.sourceName}</span><span>·</span><time dateTime={item.publishedAt}>{dateFormat.format(new Date(item.publishedAt))}</time><span className="hidden sm:inline">·</span><span className="hidden sm:inline">{analysis.tags.slice(0, 2).join(" · ")}</span></div>
         <div className="flex items-center gap-1">

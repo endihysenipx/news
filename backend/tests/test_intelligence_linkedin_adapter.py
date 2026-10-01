@@ -92,3 +92,53 @@ def test_first_check_covers_recent_posts_then_uses_incremental_window():
     now = datetime(2026, 9, 24, 9, 0, tzinfo=timezone.utc)
     assert collection_start_date(None, now) == "2026-07-26"
     assert collection_start_date(datetime(2026, 9, 20, tzinfo=timezone.utc), now) == "2026-09-19"
+
+
+def test_linkedin_activity_preserves_reposts_comments_and_unknown_counts():
+    source = SimpleNamespace(name="Company", url="https://www.linkedin.com/company/company/")
+    post = parse_posts([{
+        "url": "https://www.linkedin.com/posts/company_update-42",
+        "post_text": "Our thoughts on this announcement",
+        "num_likes": 0, "num_comments": "1,234", "num_reposts": None,
+        "repost": {"repost_url": "https://www.linkedin.com/posts/original_update-1", "repost_text": "<p>Original announcement</p>", "repost_user_name": "Original author"},
+        "top_visible_comments": [
+            {"user_name": "Reader", "comment": "Useful news", "comment_date": "2026-10-01T10:00:00Z", "comment_url": "https://www.linkedin.com/feed/update/urn:li:activity:42?commentUrn=1"},
+            {"user_name": "Reader", "comment": "Useful news", "comment_url": "https://www.linkedin.com/feed/update/urn:li:activity:42?commentUrn=1"},
+            {"comment": "", "user_name": "Empty"},
+        ],
+    }], source)[0]
+    activity = post.linkedin_data
+    assert activity["kind"] == "REPOST"
+    assert activity["reactionCount"] == 0
+    assert activity["commentCount"] == 1234
+    assert activity["repostCount"] is None
+    assert activity["originalPostText"] == "Original announcement"
+    assert "Shared post: Original announcement" in post.original_text
+    assert activity["originalAuthor"] == "Original author"
+    assert len(activity["comments"]) == 1
+    assert activity["comments"][0]["publishedAt"] == "2026-10-01T10:00:00+00:00"
+    from app.intelligence.schemas import LinkedInActivityOut
+    assert LinkedInActivityOut.model_validate(activity).kind == "REPOST"
+
+
+def test_original_post_text_and_empty_repost_object_do_not_mark_regular_posts_as_reposts():
+    activity = parse_posts([{
+        "url": "https://www.linkedin.com/posts/company_update-42",
+        "post_text": "Our post", "original_post_text": "Our post<br>",
+        "post_type": "post", "repost": {"repost_text": None, "repost_url": None},
+        "num_likes": True, "num_comments": -1, "top_visible_comments": 5,
+    }], SimpleNamespace(name="Company"))[0].linkedin_data
+    assert activity["kind"] == "POST"
+    assert activity["originalPostText"] is None
+    assert activity["reactionCount"] is None
+    assert activity["commentCount"] is None
+    assert activity["comments"] == []
+
+
+def test_activity_rejects_untrusted_comment_links_and_strips_html():
+    activity = parse_posts([{
+        "url": "https://www.linkedin.com/posts/company_update-42",
+        "top_visible_comments": [{"comment": "<b>Useful</b><script>bad()</script>", "comment_url": "javascript:alert(1)"}],
+    }], SimpleNamespace(name="Company"))[0].linkedin_data
+    assert activity["comments"][0]["url"] is None
+    assert activity["comments"][0]["text"] == "Useful"

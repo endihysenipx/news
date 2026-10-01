@@ -29,7 +29,7 @@ Run one backend worker because the five-minute scheduler lives in the API proces
 
 With OpenAI configured, the Overview page can generate a Strategic Brief from the latest saved analyses. Each live article also has a Deep analysis action with key points, business impact, suggested next steps, and questions to verify. Both actions run only when clicked and cache their results in the database; the brief updates when the set of recent articles changes or on a new UTC day. Existing imported articles can use these actions without being recollected. The AI output is based on saved source material, so verify consequential details at the original link.
 
-The company focus is a Kosovo business offering AI solutions. New AI analyses prioritize actionable grants and tenders, especially Kosovo calls, and explicitly flag unknown eligibility. Overview and High priority promote recent relevant calls ahead of broad policy news. Expired calls and beneficiary/result lists are not promoted as application opportunities. The Strategic Brief follows the same focus and regenerates when its prompt version changes.
+The company focus is a Kosovo business offering AI solutions. New AI analyses prioritize actionable grants and tenders, especially Kosovo calls, and explicitly flag unknown eligibility. Overview shows all updates ordered by publication date, newest first. The For You page keeps the personalized selection and promotes relevant current grants and tenders ahead of broad policy news. High priority filters updates by their assigned priority. Expired calls and beneficiary/result lists are not promoted as application opportunities. The Strategic Brief follows the same focus and regenerates when its prompt version changes.
 
 `NEWS_ENABLE_COLLECTION=true` starts scheduled source checks every five minutes. Each source's own interval determines whether a check actually runs. Set it to `false` while reviewing the imported snapshot without collecting new content.
 
@@ -38,3 +38,15 @@ Website collection keeps dedicated KIESA and EU Digital extractors and now also 
 ## Moving to another repository or server
 
 Before copying to another computer, run `./prepare-copy.ps1` in PowerShell from this folder. It saves the full current database to `data/01-current.sql` and stops the app. Copy the entire `news/` folder, including `.env` and `data/01-current.sql`, then run `docker compose up -d --build` at the destination. The database restore includes collected articles, sources, read state, and saved items. Restart the original copy with `docker compose up -d` if needed. No PrimeFlow deployment or database connection is needed. The local PrimeFlow checkout has had its News routes, navigation item, worker jobs, and module code removed. Historical PrimeFlow migrations and the original live tables remain for data safety until a separate verified cleanup is authorized and deployed.
+
+## LinkedIn activity
+
+LinkedIn cards show available likes/reactions, comment and repost/share counts, a preview of public comments, and shared-post content and attribution when Bright Data returns them. Missing counts remain unknown. Comment previews are partial and do not include comments the source account makes across other people's posts. Plain repost discovery depends on provider coverage; the app cannot promise a complete activity feed.
+
+Both scheduled and manual LinkedIn checks revisit the last 60 days (up to 100 returned posts per source per check), updating stored engagement and edited text without creating duplicates or resetting read/saved state. Edited text regenerates its analysis and invalidates the cached deep analysis. Existing installations add the nullable LinkedIn activity column at API startup.
+
+## Repost watch
+
+The Repost watch page separates CEO (Sheet 1, 16 accounts) and Company (Sheet 2, 15 accounts) from the supplied repost workbook. The 14 shared accounts are collected once and appear in both groups. All tracked posts appear by publication date without a relevance threshold. Available interaction guidance from each sheet is shown on the post. The page and its unread sidebar badge refresh every 30 seconds; source collection follows each source's configured interval. Only in-app notifications are enabled for these imported accounts.
+
+The curated, canonicalized source manifest is in `data/repost-watch-sources.json`, including worksheet/row provenance. Import it once, or rerun it safely, with `docker compose exec -T api python -m app.import_repost_watch /srv/news/data/repost-watch-sources.json`. Existing source records and email settings are preserved. The remaining workbook sheets are excluded from this import. Reposting is performed manually on LinkedIn.

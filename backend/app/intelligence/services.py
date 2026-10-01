@@ -18,6 +18,7 @@ class CollectedNewsItem:
     original_text: str | None
     published_at: datetime | None
     image_url: str | None = None
+    linkedin_data: dict | None = None
 
 
 class SourceAdapter(Protocol):

@@ -3,13 +3,15 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Bookmark, BriefcaseBusiness, ChevronRight, Compass, LayoutDashboard, LogOut, Mail, Menu, Newspaper, Radio, X, Zap } from "lucide-react"
+import { Bookmark, BriefcaseBusiness, ChevronRight, Compass, LayoutDashboard, LogOut, Mail, Menu, Newspaper, Radio, Repeat2, Sparkles, X, Zap } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 import { filters } from "@/features/intelligence/components/news-filters"
 
 const sections = [
   { label: "Overview", href: "/intelligence", icon: LayoutDashboard },
+  { label: "For You", href: "/intelligence/for-you", icon: Sparkles },
+  { label: "Repost watch", href: "/intelligence/repost-watch", icon: Repeat2 },
   { label: "News", href: "/intelligence/news", icon: Newspaper },
   { label: "Opportunities", href: "/intelligence/opportunities", icon: BriefcaseBusiness },
   { label: "Saved", href: "/intelligence/saved", icon: Bookmark },
@@ -24,8 +26,25 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const { user, loading, logout } = useAuth()
+  const { user, loading, logout, apiFetch } = useAuth()
   const [menuOpen, setMenuOpen] = React.useState(false)
+  const [repostUnread, setRepostUnread] = React.useState(0)
+
+  React.useEffect(() => {
+    if (!user) return
+    let active = true
+    const refresh = async () => {
+      try {
+        const response = await apiFetch("/intelligence/repost-watch/status")
+        if (!response.ok) return
+        const status = await response.json() as { unread: number }
+        if (active) setRepostUnread(status.unread)
+      } catch {}
+    }
+    void refresh()
+    const timer = window.setInterval(() => void refresh(), 30000)
+    return () => { active = false; window.clearInterval(timer) }
+  }, [user, apiFetch, pathname])
 
   React.useEffect(() => { if (!loading && !user) router.replace("/login") }, [loading, user, router])
   React.useEffect(() => { setMenuOpen(false) }, [pathname, searchParams])
@@ -39,7 +58,7 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
   if (loading || !user) return <div className="flex min-h-screen items-center justify-center bg-[#f7f8f5] text-sm text-[#647369]">Loading workspace…</div>
 
   const highPriorityActive = pathname === "/intelligence/news" && searchParams.get("priority") === "high"
-  const activeCategory = highPriorityActive ? "" : searchParams.get("category") || (pathname === "/intelligence" ? "For You" : pathname === "/intelligence/news" ? "All" : "")
+  const activeCategory = highPriorityActive ? "" : searchParams.get("category") || (pathname === "/intelligence/for-you" ? "For You" : pathname === "/intelligence" || pathname === "/intelligence/news" ? "All" : "")
 
   return <div className="min-h-screen bg-[#f7f8f5] text-[#24342a]">
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#e4e9e1] bg-white px-4 lg:hidden">
@@ -52,7 +71,7 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
       <div className="flex-1 overflow-y-auto px-3 py-5">
         <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#94a096]">Workspace</p>
         <nav aria-label="Workspace sections" className="mt-3 space-y-1">
-          {sections.map(({ label, href, icon: Icon }) => <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} className={cn("group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#54775d]", pathname === href ? "bg-[#eaf1e9] text-[#214a31]" : "text-[#64746a] hover:bg-[#f5f7f3] hover:text-[#253c2c]")}><Icon className="size-[18px]" /><span className="flex-1">{label}</span>{pathname === href ? <ChevronRight className="size-3.5 text-[#668672]" /> : null}</Link>)}
+          {sections.map(({ label, href, icon: Icon }) => <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} className={cn("group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#54775d]", pathname === href ? "bg-[#eaf1e9] text-[#214a31]" : "text-[#64746a] hover:bg-[#f5f7f3] hover:text-[#253c2c]")}><Icon className="size-[18px]" /><span className="flex-1">{label}</span>{href === "/intelligence/repost-watch" && repostUnread > 0 ? <span className="rounded-full bg-[#dcebdd] px-2 py-0.5 text-[10px] font-semibold" aria-label={`${repostUnread} unread repost watch posts`}>{repostUnread}</span> : null}{pathname === href ? <ChevronRight className="size-3.5 text-[#668672]" /> : null}</Link>)}
         </nav>
         <div className="my-6 border-t border-[#eef1ec]" />
         <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#94a096]">Quick view</p>
@@ -61,7 +80,7 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
         <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#94a096]">Explore topics</p>
         <nav aria-label="News topics" className="mt-3 space-y-0.5">
           {filters.map((filter) => {
-            const href = filter === "For You" ? "/intelligence" : filter === "All" ? "/intelligence/news" : `/intelligence/news?category=${encodeURIComponent(filter)}`
+            const href = filter === "For You" ? "/intelligence/for-you" : filter === "All" ? "/intelligence/news" : `/intelligence/news?category=${encodeURIComponent(filter)}`
             const active = pathname !== "/intelligence/sources" && activeCategory === filter
             return <Link key={filter} href={href} aria-current={active ? "page" : undefined} className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#54775d]", active ? "bg-[#f2f6ef] font-semibold text-[#25543a]" : "text-[#718077] hover:bg-[#f7f9f5] hover:text-[#284c35]")}><span className={cn("size-1.5 rounded-full", active ? "bg-[#477b53]" : "bg-[#c7d0c6]")} />{filter}</Link>
           })}

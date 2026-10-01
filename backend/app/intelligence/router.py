@@ -81,6 +81,8 @@ async def intelligence_status(_: User = Depends(require_admin)) -> IntelligenceS
 async def list_items(
     read_state: Literal["all", "unread", "read"] = "all",
     due_soon: bool = False,
+    saved_only: bool = False,
+    repost_group: Literal["ALL", "CEO", "COMPANY"] | None = None,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> NewsFeedOut:
@@ -103,6 +105,12 @@ async def list_items(
         query = query.where(NewsUserState.read_at.is_(None))
     elif read_state == "read":
         query = query.where(NewsUserState.read_at.is_not(None))
+    if saved_only:
+        query = query.where(NewsUserState.saved_at.is_not(None))
+    if repost_group == "ALL":
+        query = query.where(NewsSource.repost_groups != [])
+    elif repost_group:
+        query = query.where(NewsSource.repost_groups.contains([repost_group]))
     if due_soon:
         today = datetime.now(ZoneInfo("Europe/Budapest")).date()
         query = query.where(NewsAnalysis.category.in_(["GRANT", "TENDER", "BUSINESS", "PARTNERSHIP"]),
@@ -116,6 +124,9 @@ async def list_items(
         "publishedAt": (item.published_at or item.created_at).isoformat(),
         "imageUrl": item.image_url, "contentHash": item.content_hash,
         "createdAt": item.created_at.isoformat(), "location": None,
+        "linkedin": item.linkedin_data,
+        "repostGroups": source.repost_groups,
+        "repostGuidance": source.repost_guidance,
         "readAt": read_at.isoformat() if read_at else None,
         "emailedAt": emailed_at.isoformat() if emailed_at else None,
         "focusScore": opportunity_focus_score(item, source, analysis),
@@ -304,6 +315,20 @@ async def unsave_item(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.get("/repost-watch/status")
+async def repost_watch_status(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)) -> dict:
+    unread = (
+        select(NewsItem.id, NewsSource.repost_groups)
+        .join(NewsSource, NewsSource.id == NewsItem.source_id)
+        .join(NewsAnalysis, NewsAnalysis.news_item_id == NewsItem.id)
+        .outerjoin(NewsUserState, and_(NewsUserState.news_item_id == NewsItem.id, NewsUserState.user_id == user.id))
+        .where(NewsSource.repost_groups != [], NewsUserState.read_at.is_(None))
+    )
+    rows = (await db.execute(unread)).all()
+    return {"unread": len(rows), "CEO": sum("CEO" in groups for _, groups in rows),
+            "COMPANY": sum("COMPANY" in groups for _, groups in rows)}
+
+
 @router.get("/sources", response_model=list[NewsSourceOut])
 async def list_sources(db: AsyncSession = Depends(get_db), user: User = Depends(require_admin)) -> list[NewsSourceOut]:
     sources = (await db.execute(select(NewsSource).order_by(NewsSource.created_at.desc()))).scalars().all()
@@ -318,12 +343,15 @@ async def check_all_sources_status(_: User = Depends(require_admin)) -> dict[str
 
 
 @router.post("/sources/check-all")
-async def check_all_sources_now(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)) -> dict[str, object]:
+async def check_all_sources_now(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin), repost_group: Literal["CEO", "COMPANY"] | None = None) -> dict[str, object]:
     global _check_all_task, _check_all_status
     async with _check_all_lock:
         if _check_all_task and not _check_all_task.done():
             return _check_all_status.copy()
-        sources = (await db.execute(select(NewsSource).where(NewsSource.status == "ACTIVE"))).scalars().all()
+        query = select(NewsSource).where(NewsSource.status == "ACTIVE")
+        if repost_group:
+            query = query.where(NewsSource.repost_groups.contains([repost_group]))
+        sources = (await db.execute(query)).scalars().all()
         source_ids = [source.id for source in sources if
                       (source.type in {"WEBSITE", "RSS"} and rss_url_is_supported(source.url)) or
                       (source.type == "LINKEDIN" and linkedin_configured())]

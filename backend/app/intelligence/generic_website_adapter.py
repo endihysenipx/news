@@ -229,11 +229,12 @@ class GenericWebsiteAdapter:
         except Exception as exc:
             raise GenericWebsiteError(f"Browser could not read this website: {type(exc).__name__}.") from exc
 
-    async def collect(self) -> list[CollectedNewsItem]:
+    async def collect(self, max_items: int = MAX_LINKS) -> list[CollectedNewsItem]:
+        max_items = max(1, min(max_items, MAX_LINKS))
         async with httpx.AsyncClient(timeout=httpx.Timeout(20.0), follow_redirects=False, trust_env=False) as client:
             home = await self._get(client, self.source_url)
             if any(kind in home.content_type for kind in ("rss", "atom", "xml")):
-                return parse_feed(home.body, home.url)
+                return parse_feed(home.body, home.url)[:max_items]
             if "pdf" in home.content_type:
                 item = parse_pdf_article(home, urlsplit(home.url).path.rsplit("/", 1)[-1])
                 return [item] if item else []
@@ -244,7 +245,7 @@ class GenericWebsiteAdapter:
                     if "html" not in feed.content_type:
                         posts = parse_feed(feed.body, feed.url)
                         if posts:
-                            return posts
+                            return posts[:max_items]
                 except (httpx.HTTPError, GenericWebsiteError, ValueError):
                     pass
             if not links or not any(DOCUMENT_HINT.search(url + " " + title) for url, title in links):
@@ -267,7 +268,7 @@ class GenericWebsiteAdapter:
             if not links:
                 raise GenericWebsiteError("No public announcement links were found. This site may require a browser or sign-in.")
             posts: list[CollectedNewsItem] = []
-            for url, title in links[:MAX_LINKS]:
+            for url, title in links[:max_items]:
                 try:
                     page = await self._get(client, url)
                     item = parse_pdf_article(page, title) if "pdf" in page.content_type else parse_html_article(page, title) if "html" in page.content_type else None

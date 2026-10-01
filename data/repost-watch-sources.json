@@ -1,0 +1,392 @@
+{
+  "workbook": "LISTA REPOST ME KOMPANI AKTIVE_04_09_2026_ER 1.xlsx",
+  "sources": [
+    {
+      "name": "Ralf Heinemann",
+      "url": "https://www.linkedin.com/in/ralf-heinemann-4a06bb146/",
+      "groups": [
+        "CEO"
+      ],
+      "guidance": {
+        "CEO": "Comment regularly; repost selected posts with a first-person take on furniture operations, data or workflow control."
+      },
+      "provenance": [
+        {
+          "sheet": "CEO Profile Interaction",
+          "row": 5,
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "name": "Küchen Aktuell",
+      "url": "https://www.linkedin.com/company/k%C3%BCchen-aktuell-gmbh/",
+      "groups": [
+        "CEO",
+        "COMPANY"
+      ],
+      "guidance": {
+        "CEO": "Comment weekly; repost only expansion, operations or digital-transformation posts with added PrimEx context.",
+        "COMPANY": "Comment weekly; repost selected expansion, operations or digital-transformation posts with a PrimEx operations angle."
+      },
+      "provenance": [
+        {
+          "sheet": "CEO Profile Interaction",
+          "row": 6,
+          "rank": 2
+        },
+        {
+          "sheet": "Company Page Interaction",
+          "row": 5,
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "name": "Veriset AG",
+      "url": "https://www.linkedin.com/company/veriset/",
+      "groups": [
+        "CEO",
+        "COMPANY"
+      ],
+      "guidance": {
+        "CEO": "Comment weekly; repost only posts where the CEO can add an operations/control perspective.",
+        "COMPANY": "Comment regularly; repost selected production/process content with a short PrimEx point of view."
+      },
+      "provenance": [
+        {
+          "sheet": "CEO Profile Interaction",
+          "row": 7,
+          "rank": 3
+        },
+        {
+          "sheet": "Company Page Interaction",
+          "row": 6,
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "name": "Alpnach Schränke AG",
+      "url": "https://www.linkedin.com/company/alpnachnorm/",
+      "groups": [
+        "CEO",
+        "COMPANY"
+      ],
+      "guidance": {
+        "CEO": "Comment regularly; selective repost with a point of view on production efficiency and workflow integration.",
+        "COMPANY": "Comment weekly; repost production/automation posts with an operations-control perspective."
+      },
+      "provenance": [
+        {
+          "sheet": "CEO Profile Interaction",
+          "row": 8,
+          "rank": 4
+        },
+        {
+          "sheet": "Company Page Interaction",
+          "row": 7,
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "name": "Sachsenküchen H.-J. Ebert GmbH",
+      "url": "https://www.linkedin.com/company/sachsenk%C3%BCchen-h-j-ebert-gmbh/",
+      "groups": [
+        "CEO",
+        "COMPANY"
+      ],
+      "guidance": {
+        "CEO": "Comment regularly; repost trade/production posts when PrimEx can connect them to operations or data workflows.",
+        "COMPANY": "Comment regularly; repost trade/production posts when PrimEx can add operational context."
+      },
+      "provenance": [
+        {
+          "sheet": "CEO Profile Interaction",
+          "row": 9,
+          "rank": 5
+        },
+        {
+          "sheet": "Company Page Interaction",
+          "row": 8,
+          "rank": 4
+        }
+      ]
+    },
+    {
+      "name": "Cotta Collection AG",
+      "url": "https://www.linkedin.com/company/cotta-collection-ag/",
+      "groups": [
+        "CEO",
+        "COMPANY"
+      ],
+      "guidance": {
+        "CEO": "Comment regularly; repost selected B2B/trade posts with an operational or retail-partner angle.",
+        "COMPANY": "Comment regularly; repost selected MOW, retail-partner or production posts with PrimEx context."
+      },
+      "provenance": [
+        {
+          "sheet": "CEO Profile Interaction",
+          "row": 10,
+          "rank": 6
+        },
+        {
+          "sheet": "Company Page Interaction",
+          "row": 9,
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "name": "Sanitas Troesch",
+      "url": "https://www.linkedin.com/company/sanitastroesch/",
+      "groups": [
+        "CEO",
+        "COMPANY"
+      ],
+      "guidance": {
+        "CEO": "Comment regularly; repost business/process posts only.",
+        "COMPANY": "Comment regularly; repost planning, service, operations or efficiency content selectively."
+      },
+      "provenance": [
+        {
+          "sheet": "CEO Profile Interaction",
+          "row": 11,
+          "rank": 7
+        },
+        {
+          "sheet": "Company Page Interaction",
+          "row": 10,
+          "rank": 6
+        }
+      ]
+    },
+    {
+      "name": "Paul Holaschke — CEO, Möbel Pfister AG",
+      "url": "https://www.linkedin.com/in/paul-holaschke-44601772/",
+      "groups": [
+        "CEO"
+      ],
+      "guidance": {
+        "CEO": "Comment regularly; repost selectively with a CEO-to-CEO perspective."
+      },
+      "provenance": [
+        {
+          "sheet": "CEO Profile Interaction",
+          "row": 12,
+          "rank": 8
+        }
+      ]
+    },
+    {
+      "name": "ADA Möbelwerke",
+      "url": "https://www.linkedin.com/company/ada-moebelfabrik-gmbh/",
+      "groups": [
+        "CEO",
+        "COMPANY"
+      ],
+      "guidance": {
+        "CEO": "Comment on production/partnership topics; repost only positive operational or industry content with care.",
+        "COMPANY": "Comment on production/partnership topics; repost positive operations/trade content only."
+      },
+      "provenance": [
+        {
+          "sheet": "CEO Profile Interaction",
+          "row": 13,
+          "rank": 9
+        },
+        {
+          "sheet": "Company Page Interaction",
+          "row": 12,
+          "rank": 8
+        }
+      ]
+    },
+    {
+      "name": "MÖBEL MARTIN",
+      "url": "https://www.linkedin.com/company/m%C3%B6bel-martin/",
+      "groups": [
+        "CEO",
+        "COMPANY"
+      ],
+      "guidance": {
+        "CEO": "Comment on business/operations posts; repost rarely.",
+        "COMPANY": "Comment on business/operations posts; repost rarely and only with a clear PrimEx angle."
+      },
+      "provenance": [
+        {
+          "sheet": "CEO Profile Interaction",
+          "row": 14,
+          "rank": 10
+        },
+        {
+          "sheet": "Company Page Interaction",
+          "row": 13,
+          "rank": 9
+        }
+      ]
+    },
+    {
+      "name": "Schäfer Shop Deutschland",
+      "url": "https://www.linkedin.com/company/sch-fer-shop-gmbh/",
+      "groups": [
+        "CEO",
+        "COMPANY"
+      ],
+      "guidance": {
+        "CEO": "Comment on B2B e-commerce/AI/process posts; occasional repost with a furniture-operations takeaway.",
+        "COMPANY": "Comment on B2B e-commerce/AI/process posts; occasional repost when directly relevant."
+      },
+      "provenance": [
+        {
+          "sheet": "CEO Profile Interaction",
+          "row": 15,
+          "rank": 11
+        },
+        {
+          "sheet": "Company Page Interaction",
+          "row": 15,
+          "rank": 11
+        }
+      ]
+    },
+    {
+      "name": "Westwing",
+      "url": "https://www.linkedin.com/company/westwing-home-%26-living/",
+      "groups": [
+        "CEO",
+        "COMPANY"
+      ],
+      "guidance": {
+        "CEO": "Comment on AI, B2B and operations posts; repost only business-focused content.",
+        "COMPANY": "Comment on AI, B2B and operations content; repost selected business posts only."
+      },
+      "provenance": [
+        {
+          "sheet": "CEO Profile Interaction",
+          "row": 16,
+          "rank": 12
+        },
+        {
+          "sheet": "Company Page Interaction",
+          "row": 14,
+          "rank": 10
+        }
+      ]
+    },
+    {
+      "name": "Lista Office LO",
+      "url": "https://www.linkedin.com/company/lista-office-lo/",
+      "groups": [
+        "CEO",
+        "COMPANY"
+      ],
+      "guidance": {
+        "CEO": "Comment selectively; repost manufacturing/process posts only.",
+        "COMPANY": "Comment selectively; repost only manufacturing/process content."
+      },
+      "provenance": [
+        {
+          "sheet": "CEO Profile Interaction",
+          "row": 17,
+          "rank": 13
+        },
+        {
+          "sheet": "Company Page Interaction",
+          "row": 17,
+          "rank": 13
+        }
+      ]
+    },
+    {
+      "name": "ASSMANN Büromöbel GmbH & Co. KG",
+      "url": "https://www.linkedin.com/company/assmann-b%C3%BCrom%C3%B6bel-gmbh-%26-co.-kg/",
+      "groups": [
+        "CEO",
+        "COMPANY"
+      ],
+      "guidance": {
+        "CEO": "Comment on operations/AI/partner posts; occasional repost with a workflow perspective.",
+        "COMPANY": "Comment on operations, AI and partner-network posts; occasional repost with workflow context."
+      },
+      "provenance": [
+        {
+          "sheet": "CEO Profile Interaction",
+          "row": 18,
+          "rank": 14
+        },
+        {
+          "sheet": "Company Page Interaction",
+          "row": 16,
+          "rank": 12
+        }
+      ]
+    },
+    {
+      "name": "Matratzen Concord",
+      "url": "https://www.linkedin.com/company/matratzen-concord/",
+      "groups": [
+        "CEO",
+        "COMPANY"
+      ],
+      "guidance": {
+        "CEO": "Comment on expansion/operations posts; follow most consumer campaigns without reposting.",
+        "COMPANY": "Comment on expansion, operations or transformation posts; avoid reposting promotions."
+      },
+      "provenance": [
+        {
+          "sheet": "CEO Profile Interaction",
+          "row": 19,
+          "rank": 15
+        },
+        {
+          "sheet": "Company Page Interaction",
+          "row": 18,
+          "rank": 14
+        }
+      ]
+    },
+    {
+      "name": "bett1.de GmbH",
+      "url": "https://www.linkedin.com/company/bett1.de-gmbh/",
+      "groups": [
+        "CEO",
+        "COMPANY"
+      ],
+      "guidance": {
+        "CEO": "Comment selectively; repost only business/operations posts.",
+        "COMPANY": "Comment selectively; repost only business, growth, payments or e-commerce operations content."
+      },
+      "provenance": [
+        {
+          "sheet": "CEO Profile Interaction",
+          "row": 20,
+          "rank": 16
+        },
+        {
+          "sheet": "Company Page Interaction",
+          "row": 19,
+          "rank": 15
+        }
+      ]
+    },
+    {
+      "name": "Möbel Pfister AG",
+      "url": "https://www.linkedin.com/company/m%C3%B6bel-pfister-ag/",
+      "groups": [
+        "COMPANY"
+      ],
+      "guidance": {
+        "COMPANY": "Comment weekly; repost only operational, omnichannel, category-management or transformation topics."
+      },
+      "provenance": [
+        {
+          "sheet": "Company Page Interaction",
+          "row": 11,
+          "rank": 7
+        }
+      ]
+    }
+  ]
+}

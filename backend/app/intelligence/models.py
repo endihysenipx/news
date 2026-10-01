@@ -20,6 +20,8 @@ class NewsSource(Base):
     status: Mapped[str] = mapped_column(String(12), nullable=False, server_default="ACTIVE")
     priority: Mapped[str] = mapped_column(String(12), nullable=False, server_default="NORMAL")
     categories: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    repost_groups: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    repost_guidance: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
     ai_instructions: Mapped[str | None] = mapped_column(Text)
     fetch_interval_minutes: Mapped[int] = mapped_column(Integer, nullable=False, server_default="60")
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -47,6 +49,7 @@ class NewsItem(Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     image_url: Mapped[str | None] = mapped_column(String(2000))
     content_hash: Mapped[str | None] = mapped_column(String(64))
+    linkedin_data: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 

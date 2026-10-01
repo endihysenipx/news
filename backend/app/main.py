@@ -5,7 +5,7 @@ from pathlib import Path
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.auth import router as auth_router
 from app.config import settings
@@ -22,6 +22,9 @@ from app.intelligence.digest_router import router as digest_router
 async def lifespan(_: FastAPI):
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
+        await connection.execute(text("ALTER TABLE intelligence_items ADD COLUMN IF NOT EXISTS linkedin_data JSONB"))
+        await connection.execute(text("ALTER TABLE intelligence_sources ADD COLUMN IF NOT EXISTS repost_groups JSONB NOT NULL DEFAULT '[]'::jsonb"))
+        await connection.execute(text("ALTER TABLE intelligence_sources ADD COLUMN IF NOT EXISTS repost_guidance JSONB NOT NULL DEFAULT '{}'::jsonb"))
     snapshot = Path(__file__).resolve().parents[2] / "data" / "primeflow-export.json"
     if settings.NEWS_AUTO_IMPORT_SNAPSHOT and snapshot.is_file():
         async with SessionLocal() as session:

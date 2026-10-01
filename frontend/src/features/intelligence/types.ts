@@ -1,6 +1,7 @@
 export type NewsCategory = "GRANT" | "TENDER" | "BUSINESS" | "TECHNOLOGY" | "EVENT" | "REGULATION" | "PARTNERSHIP" | "NEWS"
 export type NewsPriority = "HIGH" | "MEDIUM" | "NORMAL"
-export type IntelligenceView = "overview" | "news" | "opportunities" | "saved"
+export type IntelligenceView = "overview" | "for-you" | "repost-watch" | "news" | "opportunities" | "saved"
+export type RepostGroup = "CEO" | "COMPANY"
 export type NewsFilter = "For You" | "All" | "Grants" | "Tenders" | "Business" | "AI & Tech" | "Kosovo" | "EU" | "Events"
 
 export interface NewsAnalysis {
@@ -36,7 +37,24 @@ export interface NewsEntry {
   location: string | null
   priority: NewsPriority
   focusScore?: number
+  linkedin?: LinkedInActivity | null
+  repostGroups?: RepostGroup[]
+  repostGuidance?: Partial<Record<RepostGroup, string>>
   analysis: NewsAnalysis
+}
+
+export interface LinkedInActivity {
+  kind: "POST" | "REPOST" | "ARTICLE"
+  authorName: string | null
+  authorUrl: string | null
+  reactionCount: number | null
+  commentCount: number | null
+  repostCount: number | null
+  comments: { author: string | null; text: string; url: string | null; publishedAt: string | null }[]
+  originalPostText: string | null
+  originalPostUrl: string | null
+  originalAuthor: string | null
+  checkedAt: string | null
 }
 
 export interface DailyBrief {
@@ -85,11 +103,13 @@ export interface NewsSource {
   last_error: string | null
   collection_supported: boolean
   email_enabled: boolean
+  repost_groups: RepostGroup[]
+  repost_guidance: Partial<Record<RepostGroup, string>>
   created_at: string
   updated_at: string
 }
 
-export type NewsSourceInput = Pick<NewsSource, "name" | "url" | "type" | "status" | "priority" | "categories" | "ai_instructions" | "fetch_interval_minutes" | "email_enabled">
+export type NewsSourceInput = Pick<NewsSource, "name" | "url" | "type" | "status" | "priority" | "categories" | "ai_instructions" | "fetch_interval_minutes" | "email_enabled" | "repost_groups" | "repost_guidance">
 
 export interface DigestSettings {
   times: string[]

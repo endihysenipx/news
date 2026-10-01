@@ -12,6 +12,7 @@ SourceStatus = Literal["ACTIVE", "PAUSED"]
 SourcePriority = Literal["HIGH", "NORMAL", "LOW"]
 NewsCategory = Literal["NEWS", "GRANT", "TENDER", "EVENT", "BUSINESS", "TECHNOLOGY", "REGULATION", "PARTNERSHIP"]
 SourceCategory = Literal["Grants", "Tenders", "Funding", "Business", "Events", "Technology", "Regulations", "Partnerships", "General News"]
+RepostGroup = Literal["CEO", "COMPANY"]
 
 
 class NewsSourceCreate(BaseModel):
@@ -24,6 +25,8 @@ class NewsSourceCreate(BaseModel):
     ai_instructions: str | None = Field(default=None, max_length=4000)
     fetch_interval_minutes: int = Field(default=60, ge=5, le=10080)
     email_enabled: bool = False
+    repost_groups: list[RepostGroup] = Field(default_factory=list, max_length=2)
+    repost_guidance: dict[RepostGroup, str] = Field(default_factory=dict)
 
     @field_validator("name", "url")
     @classmethod
@@ -43,6 +46,9 @@ class NewsSourceCreate(BaseModel):
 
     @model_validator(mode="after")
     def valid_linkedin_profile(self) -> "NewsSourceCreate":
+        self.repost_groups = list(dict.fromkeys(self.repost_groups))
+        if self.repost_groups and self.type != "LINKEDIN":
+            raise ValueError("Repost watch groups require a LinkedIn source.")
         if self.type == "LINKEDIN":
             parsed = urlparse(self.url)
             segments = [part for part in parsed.path.split("/") if part]
@@ -77,6 +83,8 @@ class NewsSourceOut(BaseModel):
     email_enabled: bool = False
     created_at: datetime
     updated_at: datetime
+    repost_groups: list[RepostGroup] = Field(default_factory=list)
+    repost_guidance: dict[RepostGroup, str] = Field(default_factory=dict)
 
     model_config = {"from_attributes": True}
 
@@ -113,6 +121,27 @@ class FeedAnalysisOut(BaseModel):
     tags: list[str]
 
 
+class LinkedInCommentOut(BaseModel):
+    author: str | None = None
+    text: str
+    url: str | None = None
+    publishedAt: str | None = None
+
+
+class LinkedInActivityOut(BaseModel):
+    kind: Literal["POST", "REPOST", "ARTICLE"] = "POST"
+    authorName: str | None = None
+    authorUrl: str | None = None
+    reactionCount: int | None = Field(default=None, ge=0)
+    commentCount: int | None = Field(default=None, ge=0)
+    repostCount: int | None = Field(default=None, ge=0)
+    comments: list[LinkedInCommentOut] = Field(default_factory=list)
+    originalPostText: str | None = None
+    originalPostUrl: str | None = None
+    originalAuthor: str | None = None
+    checkedAt: str | None = None
+
+
 class FeedItemOut(BaseModel):
     id: str
     sourceId: str
@@ -129,6 +158,9 @@ class FeedItemOut(BaseModel):
     readAt: str | None
     emailedAt: str | None
     savedAt: str | None
+    linkedin: LinkedInActivityOut | None = None
+    repostGroups: list[RepostGroup] = Field(default_factory=list)
+    repostGuidance: dict[RepostGroup, str] = Field(default_factory=dict)
     location: str | None
     priority: Literal["HIGH", "NORMAL"]
     focusScore: int

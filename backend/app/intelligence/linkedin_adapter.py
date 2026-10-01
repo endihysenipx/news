@@ -8,6 +8,7 @@ from email.utils import parsedate_to_datetime
 from urllib.parse import urlparse, urlunparse
 
 import httpx
+from bs4 import BeautifulSoup
 
 from app.intelligence.models import NewsSource
 from app.intelligence.services import CollectedNewsItem
@@ -38,6 +39,15 @@ def _belongs_to_source(record: dict, source: NewsSource) -> bool:
     if len(source_path) < 2 or source_path[0] != "in":
         return True
     profile_id = source_path[1].casefold()
+    reposter = record.get("reposted_by") or record.get("shared_by")
+    if isinstance(reposter, dict):
+        reposter = reposter.get("url") or reposter.get("user_url") or reposter.get("user_id")
+    if isinstance(reposter, str):
+        reposter_path = urlparse(reposter).path.strip("/").split("/")
+        if reposter.casefold() == profile_id or (
+            _linkedin_url(reposter) and reposter_path == ["in", source_path[1]]
+        ):
+            return True
     author_id = record.get("user_id")
     if isinstance(author_id, str) and author_id:
         return author_id.casefold() == profile_id
@@ -62,6 +72,86 @@ def _published(value: object) -> datetime | None:
     return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed
 
 
+def _text(value: object, limit: int = 4000) -> str | None:
+    if not isinstance(value, str):
+        return None
+    if re.search(r"</?[a-zA-Z][^>]*>", value):
+        soup = BeautifulSoup(value[:100000], "html.parser")
+        for element in soup(["script", "style"]):
+            element.decompose()
+        value = soup.get_text(" ", strip=True)
+    return " ".join(value.split())[:limit] or None
+
+
+def _linkedin_url(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    parsed = urlparse(value)
+    if parsed.scheme != "https" or parsed.username or parsed.password or parsed.hostname not in {"linkedin.com", "www.linkedin.com"}:
+        return None
+    return urlunparse(("https", "www.linkedin.com", parsed.path, "", parsed.query, ""))[:2000]
+
+
+def _count(record: dict, *keys: str) -> int | None:
+    for key in keys:
+        value = record.get(key)
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, int) and value >= 0:
+            return value
+        if isinstance(value, str) and re.fullmatch(r"\d+", value.replace(",", "").strip()):
+            return int(value.replace(",", "").strip())
+    return None
+
+
+def _activity(record: dict) -> dict:
+    """Keep only observed activity; missing counts are unknown, never zero."""
+    repost = record.get("repost")
+    repost = repost if isinstance(repost, dict) else {}
+    original_text = _text(repost.get("repost_text") or repost.get("post_text") or repost.get("text"), 20000)
+    original_url = _post_url(repost.get("repost_url") or repost.get("url") or repost.get("post_url") or record.get("original_post_url"))
+    post_type = str(record.get("post_type") or "").casefold()
+    kind = "REPOST" if post_type in {"repost", "share", "reshare", "shared_post"} or original_text or original_url else "ARTICLE" if post_type == "article" else "POST"
+    raw_comments = record.get("top_visible_comments")
+    if not isinstance(raw_comments, list):
+        raw_comments = record.get("comments")
+    comments = []
+    seen = set()
+    for comment in raw_comments[:100] if isinstance(raw_comments, list) else []:
+        if isinstance(comment, str):
+            comment = {"text": comment}
+        if not isinstance(comment, dict):
+            continue
+        body = _text(comment.get("comment") or comment.get("text") or comment.get("comment_text") or comment.get("content"))
+        if not body:
+            continue
+        author = comment.get("author") or comment.get("user")
+        if isinstance(author, dict):
+            author = author.get("name")
+        author = _text(comment.get("user_name") or comment.get("name") or author, 200)
+        url = _linkedin_url(comment.get("url") or comment.get("comment_url"))
+        key = (author, body, url)
+        if key in seen:
+            continue
+        seen.add(key)
+        published = _published(comment.get("comment_date") or comment.get("date_posted") or comment.get("date") or comment.get("published_at"))
+        comments.append({"author": author, "text": body, "url": url, "publishedAt": published.isoformat() if published else None})
+    checked = _published(record.get("timestamp"))
+    return {
+        "kind": kind,
+        "authorName": _text(record.get("user_name") or record.get("company_name"), 200),
+        "authorUrl": _linkedin_url(record.get("use_url") or record.get("user_url") or record.get("company_url")),
+        "reactionCount": _count(record, "num_likes", "num_reactions"),
+        "commentCount": _count(record, "num_comments"),
+        "repostCount": _count(record, "num_reposts", "num_shares"),
+        "comments": comments,
+        "originalPostText": original_text,
+        "originalPostUrl": original_url,
+        "originalAuthor": _text(repost.get("repost_user_name"), 200),
+        "checkedAt": checked.isoformat() if checked else None,
+    }
+
+
 def parse_posts(records: object, source: NewsSource) -> list[CollectedNewsItem]:
     if not isinstance(records, list):
         raise LinkedInCollectionError("The provider returned an unexpected snapshot format.")
@@ -74,6 +164,9 @@ def parse_posts(records: object, source: NewsSource) -> list[CollectedNewsItem]:
             continue
         body = record.get("post_text") or record.get("text") or record.get("headline") or ""
         body = " ".join(body.split()) if isinstance(body, str) else ""
+        activity = _activity(record)
+        if activity["kind"] == "REPOST" and activity["originalPostText"]:
+            body = f"{body}\nShared post: {activity['originalPostText']}".strip()
         title = record.get("title")
         if not isinstance(title, str) or not title.strip():
             title = body[:140].rstrip(" .") + ("…" if len(body) > 140 else "") if body else f"Post by {source.name}"
@@ -82,6 +175,7 @@ def parse_posts(records: object, source: NewsSource) -> list[CollectedNewsItem]:
             external_id=str(identifier)[:500], url=url, title=title.strip()[:500],
             original_text=body[:20_000] or None,
             published_at=_published(record.get("date_posted") or record.get("published_at")),
+            linkedin_data=activity,
         ))
     if records and not posts:
         raise LinkedInCollectionError("Provider returned no usable direct post links for this source.")

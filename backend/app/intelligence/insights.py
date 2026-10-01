@@ -104,7 +104,8 @@ async def _save_cache(db: AsyncSession, key: str, value: str) -> None:
 
 
 async def deep_insight(db: AsyncSession, item: NewsItem, source: NewsSource, analysis: NewsAnalysis) -> DeepInsightOut:
-    key = f"deep_insight:v2:{settings.INTELLIGENCE_AI_MODEL}:{item.id}"
+    content_version = hashlib.sha256(f"{settings.INTELLIGENCE_AI_MODEL}\n{item.title}\n{item.original_text or ''}".encode()).hexdigest()[:16]
+    key = f"deep_insight:v3:{item.id}:{content_version}"
     cached = await _cached(db, key)
     if cached:
         return DeepInsightOut.model_validate_json(cached)

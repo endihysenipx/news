@@ -48,11 +48,32 @@ def collection_start_date(last_checked_at: datetime | None, now: datetime) -> st
 
 async def _store_post(db: AsyncSession, source: NewsSource, post: CollectedNewsItem) -> bool:
     content_hash = hashlib.sha256(post.url.encode("utf-8")).hexdigest()
-    exists = await db.scalar(select(NewsItem.id).where(
+    existing = await db.scalar(select(NewsItem).where(
         NewsItem.source_id == source.id,
         or_(NewsItem.external_id == post.external_id, NewsItem.content_hash == content_hash, NewsItem.url == post.url),
     ).limit(1))
-    if exists:
+    if existing and source.type == "LINKEDIN" and post.linkedin_data is not None:
+        content_changed = existing.title != post.title or existing.original_text != post.original_text
+        if content_changed:
+            analysis = await analyze_news_item(post, source)
+            saved_analysis = await db.get(NewsAnalysis, existing.id)
+            if saved_analysis:
+                for field, value in {
+                    "summary": analysis.summary, "category": analysis.category,
+                    "importance_score": analysis.importanceScore, "relevance_score": analysis.relevanceScore,
+                    "why_it_matters": analysis.whyItMatters, "deadline": analysis.deadline,
+                    "funding_amount": analysis.fundingAmount, "eligibility": analysis.eligibility,
+                    "opportunity_type": analysis.opportunityType, "tags": analysis.tags,
+                }.items():
+                    setattr(saved_analysis, field, value)
+                saved_analysis.analyzed_at = datetime.now(timezone.utc)
+            existing.title = post.title
+            existing.original_text = post.original_text
+        existing.linkedin_data = {**post.linkedin_data, "checkedAt": post.linkedin_data.get("checkedAt") or datetime.now(timezone.utc).isoformat()}
+        if post.published_at:
+            existing.published_at = post.published_at
+        return False
+    if existing:
         return False
     analysis = await analyze_news_item(post, source)
     if not category_allowed(source.categories or [], analysis.category):
@@ -61,6 +82,7 @@ async def _store_post(db: AsyncSession, source: NewsSource, post: CollectedNewsI
         source_id=source.id, external_id=post.external_id, url=post.url,
         title=post.title, original_text=post.original_text,
         published_at=post.published_at, image_url=post.image_url, content_hash=content_hash,
+        linkedin_data={**post.linkedin_data, "checkedAt": post.linkedin_data.get("checkedAt") or datetime.now(timezone.utc).isoformat()} if post.linkedin_data is not None else None,
     )
     db.add(item)
     await db.flush()
@@ -187,7 +209,8 @@ async def check_source(db: AsyncSession, source_id: uuid.UUID, *, force: bool = 
             return "pending"
         snapshot = await adapter.trigger(
             source,
-            start_date=collection_start_date(None if force else source.last_checked_at, now),
+            # Revisit the recent window so comments, engagement and edits refresh too.
+            start_date=collection_start_date(None, now),
             end_date=now.date().isoformat(),
         )
         source.pending_snapshot_id = snapshot
