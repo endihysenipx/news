@@ -1,4 +1,4 @@
-import { ArrowUpRight, Bookmark, CalendarDays, Check, CircleDollarSign, LoaderCircle, Mail, MapPin, RotateCcw } from "lucide-react"
+import { ArrowUpRight, Bookmark, CalendarDays, Check, CircleDollarSign, Code2, Facebook, Globe, Linkedin, LoaderCircle, Mail, MapPin, Radio, RotateCcw, Rss } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { NewsEntry, RepostGroup } from "../types"
@@ -10,12 +10,17 @@ const publishedDateFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", m
 const sourceTypeLabels: Record<string, string> = {
   WEBSITE: "Website", RSS: "RSS", LINKEDIN: "LinkedIn", FACEBOOK: "Facebook", API: "API", OTHER: "Other",
 }
+const sourceTypeIcons = { WEBSITE: Globe, RSS: Rss, LINKEDIN: Linkedin, FACEBOOK: Facebook, API: Code2, OTHER: Radio }
+const sourceTypeStyles: Record<string, string> = {
+  LINKEDIN: "bg-[#e7f1fb] text-[#0a66c2]", FACEBOOK: "bg-[#e7f1fb] text-[#1877f2]", RSS: "bg-[#fff1e6] text-[#a64c0a]",
+}
 const categoryLabels: Record<NewsEntry["analysis"]["category"], string> = {
   GRANT: "Grant", TENDER: "Tender", BUSINESS: "Business", TECHNOLOGY: "AI & Tech", EVENT: "Event", REGULATION: "Regulation", PARTNERSHIP: "Partnership", NEWS: "News",
 }
 
 export function NewsCard({ item, activityView = false, repostGroup, saved, read, canEmail, emailRecipient, canAnalyze, apiFetch, emailSending, emailBusy, onToggleSaved, onSetRead, onEmail }: { item: NewsEntry; activityView?: boolean; repostGroup?: RepostGroup; saved: boolean; read: boolean; canEmail: boolean; emailRecipient: string; canAnalyze: boolean; apiFetch: (path: string, init?: RequestInit) => Promise<Response>; emailSending: boolean; emailBusy: boolean; onToggleSaved: (id: string) => void; onSetRead: (id: string, read: boolean) => void; onEmail: (id: string) => void }) {
   const analysis = item.analysis
+  const SourceIcon = sourceTypeIcons[item.sourceType as keyof typeof sourceTypeIcons] ?? Radio
   const isOpportunity = analysis.category === "GRANT" || analysis.category === "TENDER"
   const markFromLink = () => { if (!read) onSetRead(item.id, true) }
   return (
@@ -28,10 +33,13 @@ export function NewsCard({ item, activityView = false, repostGroup, saved, read,
           <span className={cn(item.priority === "HIGH" ? "text-[#587463]" : "text-[#8b9690]")}>{item.priority === "HIGH" ? "High priority" : item.priority === "MEDIUM" ? "Medium priority" : "Normal priority"}</span>
           <span className="text-[#c1c9c3]">·</span>
           <span className={cn("rounded-full px-2 py-0.5", read ? "bg-[#f0f2ef] text-[#66756a]" : "bg-[#e3f1e5] text-[#346b45]")}>{read ? "Read" : "Unread"}</span>
-          <span aria-hidden="true" className="text-[#c1c9c3]">·</span>
-          <span aria-label="Source type" className="normal-case tracking-normal text-[#4f7161]">{sourceTypeLabels[item.sourceType] ?? item.sourceType}</span>
-          <span aria-hidden="true" className="text-[#c1c9c3]">·</span>
-          <span aria-label="Source name" className="max-w-full break-words normal-case tracking-normal text-[#55645a]">{item.sourceName}</span>
+          <span className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-lg border border-[#dce4df] bg-[#f8faf8] p-1.5 pr-3 text-[13px] normal-case tracking-normal sm:ml-1">
+            <span aria-label="Source type" className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 font-semibold", sourceTypeStyles[item.sourceType] ?? "bg-[#e9f0e9] text-[#365c44]")}>
+              <SourceIcon aria-hidden="true" className="size-3.5" />
+              {sourceTypeLabels[item.sourceType] ?? item.sourceType}
+            </span>
+            <span aria-label="Source name" className="min-w-0 max-w-full break-words font-semibold text-[#263e30]">{item.sourceName}</span>
+          </span>
         </div>
         <button type="button" onClick={() => onToggleSaved(item.id)} aria-label={saved ? `Remove ${item.title} from saved` : `Save ${item.title}`} aria-pressed={saved} title={saved ? "Remove from saved" : "Save item"} className={cn("-mr-2 -mt-2 rounded-lg p-2 text-[#87918b] transition-colors hover:bg-[#f3f5f2] hover:text-[#293e32] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5e806c]", saved && "text-[#4d715d]")}><Bookmark className={cn("size-[18px]", saved && "fill-current")} /></button>
       </div>
