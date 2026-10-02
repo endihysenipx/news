@@ -48,10 +48,24 @@ async def ensure_digest_settings(db: AsyncSession, user_id: uuid.UUID) -> NewsDi
     return digest
 
 
-def digest_content(entries: list[dict], slot: datetime) -> tuple[str, str, str]:
+def digest_content(entries: list[dict], slot: datetime, source_names: list[str] | None = None) -> tuple[str, str, str]:
     local_slot = slot.astimezone(DIGEST_ZONE)
     stamp = local_slot.strftime("%d.%m.%Y %H:%M")
     count = len(entries)
+    if not entries:
+        subject = f"[News Intelligence] Nuk ka lajme të reja · {local_slot:%H:%M}"
+        message = "Për këtë orar nuk ka lajme të reja për raportim nga burimet e zgjedhura. Lajmet e dërguara më parë nuk përsëriten."
+        sources = ", ".join(source_names or [])
+        body = f"Raporti i njoftimeve · {stamp} (Europe/Budapest)\n\nNuk ka lajme të reja\n{message}\n\nBurimet: {sources}"
+        html = (
+            '<div style="max-width:680px;margin:auto;padding:28px;font-family:Arial,sans-serif;color:#24342a">'
+            '<p style="color:#63866a;font-size:12px;font-weight:700;letter-spacing:2px">NEWS INTELLIGENCE</p>'
+            '<h1 style="font-size:25px;margin:8px 0">Nuk ka lajme të reja</h1>'
+            f'<p style="color:#718074">{escape(stamp)} · Europe/Budapest</p>'
+            f'<p style="padding:20px;background:#f3f7f3;border-radius:12px;line-height:1.6">{escape(message)}</p>'
+            f'<p style="font-size:13px;color:#687b6c"><strong>Burimet:</strong> {escape(sources)}</p></div>'
+        )
+        return subject, body, html
     subject = f"[News Intelligence] {count} njoftime të reja · {local_slot:%H:%M}"
     sections: dict[str, list[dict]] = {}
     for entry in entries:
@@ -117,6 +131,16 @@ async def process_digest(db: AsyncSession, user_id: uuid.UUID, now: datetime | N
     slot = latest_slot(now, digest.times)
     if digest.last_slot_at >= slot:
         return 0
+    sources = (await db.scalars(
+        select(NewsSource)
+        .join(NewsSourceEmailSubscription, NewsSourceEmailSubscription.source_id == NewsSource.id)
+        .where(NewsSourceEmailSubscription.user_id == user_id, NewsSource.status == "ACTIVE")
+        .order_by(NewsSource.name)
+    )).all()
+    if not sources:
+        digest.last_slot_at = slot
+        await db.commit()
+        return 0
     by_url: dict[str, dict] = {}
     source_rows = (await db.execute(
         select(NewsItem, NewsAnalysis, NewsSource)
@@ -136,17 +160,16 @@ async def process_digest(db: AsyncSession, user_id: uuid.UUID, now: datetime | N
     for url, entry in by_url.items():
         if hashes[url] not in delivered:
             entries.append(entry)
-    if entries:
-        subject, body, html = digest_content(entries, slot)
-        try:
-            await _send_digest(subject, body, html)
-        except Exception as exc:
-            digest.last_error = str(exc)[:500]
-            await db.commit()
-            raise
-        for entry in entries:
-            db.add(NewsDigestDelivery(user_id=user_id, url_hash=hashes[entry["item"].url], sent_at=now))
-        digest.last_sent_at = now
+    subject, body, html = digest_content(entries, slot, [source.name for source in sources])
+    try:
+        await _send_digest(subject, body, html)
+    except Exception as exc:
+        digest.last_error = str(exc)[:500]
+        await db.commit()
+        raise
+    for entry in entries:
+        db.add(NewsDigestDelivery(user_id=user_id, url_hash=hashes[entry["item"].url], sent_at=now))
+    digest.last_sent_at = now
     digest.last_slot_at = slot
     digest.last_error = None
     await db.commit()
