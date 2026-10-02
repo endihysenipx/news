@@ -85,6 +85,8 @@ async def list_items(
     repost_group: Literal["ALL", "CEO", "COMPANY"] | None = None,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
+    source_id: uuid.UUID | None = None,
+    activity_kind: Literal["POST", "REPOST"] | None = None,
 ) -> NewsFeedOut:
     source_rows = (await db.execute(select(NewsSource.type, NewsSource.url).where(
         NewsSource.type.in_(["LINKEDIN", "WEBSITE", "RSS"]),
@@ -111,6 +113,11 @@ async def list_items(
         query = query.where(NewsSource.repost_groups != [])
     elif repost_group:
         query = query.where(NewsSource.repost_groups.contains([repost_group]))
+    if source_id is not None:
+        query = query.where(NewsSource.id == source_id)
+    if activity_kind:
+        kind = func.coalesce(NewsItem.linkedin_data["kind"].as_string(), "POST")
+        query = query.where(NewsSource.type == "LINKEDIN", kind == "REPOST" if activity_kind == "REPOST" else kind.in_(["POST", "ARTICLE"]))
     if due_soon:
         today = datetime.now(ZoneInfo("Europe/Budapest")).date()
         query = query.where(NewsAnalysis.category.in_(["GRANT", "TENDER", "BUSINESS", "PARTNERSHIP"]),
@@ -343,7 +350,7 @@ async def check_all_sources_status(_: User = Depends(require_admin)) -> dict[str
 
 
 @router.post("/sources/check-all")
-async def check_all_sources_now(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin), repost_group: Literal["CEO", "COMPANY"] | None = None) -> dict[str, object]:
+async def check_all_sources_now(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin), repost_group: Literal["CEO", "COMPANY"] | None = None, source_id: uuid.UUID | None = None) -> dict[str, object]:
     global _check_all_task, _check_all_status
     async with _check_all_lock:
         if _check_all_task and not _check_all_task.done():
@@ -351,6 +358,8 @@ async def check_all_sources_now(db: AsyncSession = Depends(get_db), _: User = De
         query = select(NewsSource).where(NewsSource.status == "ACTIVE")
         if repost_group:
             query = query.where(NewsSource.repost_groups.contains([repost_group]))
+        if source_id is not None:
+            query = query.where(NewsSource.id == source_id)
         sources = (await db.execute(query)).scalars().all()
         source_ids = [source.id for source in sources if
                       (source.type in {"WEBSITE", "RSS"} and rss_url_is_supported(source.url)) or

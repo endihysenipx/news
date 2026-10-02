@@ -1,6 +1,6 @@
 export type NewsCategory = "GRANT" | "TENDER" | "BUSINESS" | "TECHNOLOGY" | "EVENT" | "REGULATION" | "PARTNERSHIP" | "NEWS"
 export type NewsPriority = "HIGH" | "MEDIUM" | "NORMAL"
-export type IntelligenceView = "overview" | "for-you" | "repost-watch" | "news" | "opportunities" | "saved"
+export type IntelligenceView = "overview" | "for-you" | "repost-watch" | "primex-linkedin" | "news" | "opportunities" | "saved"
 export type RepostGroup = "CEO" | "COMPANY"
 export type NewsFilter = "For You" | "All" | "Grants" | "Tenders" | "Business" | "AI & Tech" | "Kosovo" | "EU" | "Events"
 

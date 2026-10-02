@@ -10,7 +10,7 @@ const categoryLabels: Record<NewsEntry["analysis"]["category"], string> = {
   GRANT: "Grant", TENDER: "Tender", BUSINESS: "Business", TECHNOLOGY: "AI & Tech", EVENT: "Event", REGULATION: "Regulation", PARTNERSHIP: "Partnership", NEWS: "News",
 }
 
-export function NewsCard({ item, repostGroup, saved, read, canEmail, emailRecipient, canAnalyze, apiFetch, emailSending, emailBusy, onToggleSaved, onSetRead, onEmail }: { item: NewsEntry; repostGroup?: RepostGroup; saved: boolean; read: boolean; canEmail: boolean; emailRecipient: string; canAnalyze: boolean; apiFetch: (path: string, init?: RequestInit) => Promise<Response>; emailSending: boolean; emailBusy: boolean; onToggleSaved: (id: string) => void; onSetRead: (id: string, read: boolean) => void; onEmail: (id: string) => void }) {
+export function NewsCard({ item, activityView = false, repostGroup, saved, read, canEmail, emailRecipient, canAnalyze, apiFetch, emailSending, emailBusy, onToggleSaved, onSetRead, onEmail }: { item: NewsEntry; activityView?: boolean; repostGroup?: RepostGroup; saved: boolean; read: boolean; canEmail: boolean; emailRecipient: string; canAnalyze: boolean; apiFetch: (path: string, init?: RequestInit) => Promise<Response>; emailSending: boolean; emailBusy: boolean; onToggleSaved: (id: string) => void; onSetRead: (id: string, read: boolean) => void; onEmail: (id: string) => void }) {
   const analysis = item.analysis
   const isOpportunity = analysis.category === "GRANT" || analysis.category === "TENDER"
   const markFromLink = () => { if (!read) onSetRead(item.id, true) }
@@ -19,7 +19,7 @@ export function NewsCard({ item, repostGroup, saved, read, canEmail, emailRecipi
       {item.priority === "HIGH" ? <span aria-hidden="true" className="absolute bottom-5 left-0 top-5 w-[3px] rounded-r-full bg-[#758f82]" /> : null}
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.12em]">
-          <span className="text-[#4f7161]">{categoryLabels[analysis.category]}</span>
+          <span className="text-[#4f7161]">{activityView ? item.linkedin?.kind === "REPOST" ? "Repost" : item.linkedin?.kind === "ARTICLE" ? "Article" : "Post" : categoryLabels[analysis.category]}</span>
           <span className="text-[#c1c9c3]">·</span>
           <span className={cn(item.priority === "HIGH" ? "text-[#587463]" : "text-[#8b9690]")}>{item.priority === "HIGH" ? "High priority" : item.priority === "MEDIUM" ? "Medium priority" : "Normal priority"}</span>
           <span className="text-[#c1c9c3]">·</span>
@@ -29,6 +29,7 @@ export function NewsCard({ item, repostGroup, saved, read, canEmail, emailRecipi
       </div>
       <h3 className="mt-2 line-clamp-2 max-w-3xl text-[17px] font-semibold leading-snug tracking-[-0.02em] text-[#1e2a25] sm:text-[18px]" title={item.title}>{item.url ? <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={markFromLink} onAuxClick={(event) => { if (event.button === 1) markFromLink() }} className="rounded-sm hover:text-[#3f6a4c] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5e806c]">{item.title}</a> : item.title}</h3>
       <p className="mt-2 line-clamp-3 max-w-3xl text-sm leading-6 text-[#66716a]">{analysis.summary}</p>
+      {activityView && item.originalText ? <details className="mt-4 rounded-lg bg-[#f6f8f5] p-3 text-xs text-[#68776b]"><summary className="cursor-pointer font-medium">Full post text</summary><p className="mt-2 whitespace-pre-wrap text-sm leading-6">{item.originalText}</p></details> : null}
       {isOpportunity && (analysis.fundingAmount || analysis.deadline || analysis.eligibility || item.location) ? (
         <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 rounded-lg bg-[#f6f8f5] px-3.5 py-3 text-xs text-[#55635a]">
           {analysis.fundingAmount ? <span className="flex items-center gap-1.5"><CircleDollarSign className="size-3.5 text-[#789180]" /><strong className="font-medium text-[#2d3c32]">Funding</strong> {analysis.fundingAmount}</span> : null}

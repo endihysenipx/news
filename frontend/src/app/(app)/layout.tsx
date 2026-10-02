@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Bookmark, BriefcaseBusiness, ChevronRight, Compass, LayoutDashboard, LogOut, Mail, Menu, Newspaper, Radio, Repeat2, Sparkles, X, Zap } from "lucide-react"
+import { Bookmark, BriefcaseBusiness, ChevronRight, Compass, LayoutDashboard, Linkedin, LogOut, Mail, Menu, Newspaper, Radio, Repeat2, Sparkles, X, Zap } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 import { filters } from "@/features/intelligence/components/news-filters"
@@ -12,6 +12,7 @@ const sections = [
   { label: "Overview", href: "/intelligence", icon: LayoutDashboard },
   { label: "For You", href: "/intelligence/for-you", icon: Sparkles },
   { label: "Repost watch", href: "/intelligence/repost-watch", icon: Repeat2 },
+  { label: "PrimEx LinkedIn", href: "/intelligence/primex-linkedin", icon: Linkedin },
   { label: "News", href: "/intelligence/news", icon: Newspaper },
   { label: "Opportunities", href: "/intelligence/opportunities", icon: BriefcaseBusiness },
   { label: "Saved", href: "/intelligence/saved", icon: Bookmark },

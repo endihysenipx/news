@@ -47,6 +47,8 @@ Both scheduled and manual LinkedIn checks revisit the last 60 days (up to 100 re
 
 ## Repost watch
 
+The **PrimEx LinkedIn** workspace section uses the existing LinkedIn source at `https://www.linkedin.com/company/primexeu/`. It shows only that company page's collected activity, newest first, with All activity, Posts, and Reposts filters, full post text, and available engagement and comments. The page refreshes every 30 seconds, and its **Check for updates** action checks only the PrimEx source. Posts includes LinkedIn articles and older entries without activity metadata. Repost visibility depends on what Bright Data returns; an empty Reposts tab does not establish that the company has never reposted.
+
 The Repost watch page separates CEO (Sheet 1, 16 accounts) and Company (Sheet 2, 15 accounts) from the supplied repost workbook. The 14 shared accounts are collected once and appear in both groups. All tracked posts appear by publication date without a relevance threshold. Available interaction guidance from each sheet is shown on the post. The page and its unread sidebar badge refresh every 30 seconds; source collection follows each source's configured interval. Only in-app notifications are enabled for these imported accounts.
 
 The curated, canonicalized source manifest is in `data/repost-watch-sources.json`, including worksheet/row provenance. Import it once, or rerun it safely, with `docker compose exec -T api python -m app.import_repost_watch /srv/news/data/repost-watch-sources.json`. Existing source records and email settings are preserved. The remaining workbook sheets are excluded from this import. Reposting is performed manually on LinkedIn.
