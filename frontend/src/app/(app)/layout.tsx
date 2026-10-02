@@ -10,7 +10,6 @@ import { filters } from "@/features/intelligence/components/news-filters"
 
 const sections = [
   { label: "Overview", href: "/intelligence", icon: LayoutDashboard },
-  { label: "Sources", href: "/intelligence/sources", icon: Radio, adminOnly: true },
   { label: "For You", href: "/intelligence/for-you", icon: Sparkles },
   { label: "Repost watch", href: "/intelligence/repost-watch", icon: Repeat2 },
   { label: "PrimEx LinkedIn", href: "/intelligence/primex-linkedin", icon: Linkedin },
@@ -18,6 +17,7 @@ const sections = [
   { label: "Opportunities", href: "/intelligence/opportunities", icon: BriefcaseBusiness },
   { label: "Saved", href: "/intelligence/saved", icon: Bookmark },
   { label: "Email settings", href: "/intelligence/email-settings", icon: Mail },
+  { label: "Sources", href: "/intelligence/sources", icon: Radio, adminOnly: true },
 ]
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
