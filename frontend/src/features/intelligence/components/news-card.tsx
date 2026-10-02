@@ -6,6 +6,10 @@ import { DeepInsightAction } from "./deep-insight"
 import { LinkedInActivity } from "./linkedin-activity"
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" })
+const publishedDateFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Budapest" })
+const sourceTypeLabels: Record<string, string> = {
+  WEBSITE: "Website", RSS: "RSS", LINKEDIN: "LinkedIn", FACEBOOK: "Facebook", API: "API", OTHER: "Other",
+}
 const categoryLabels: Record<NewsEntry["analysis"]["category"], string> = {
   GRANT: "Grant", TENDER: "Tender", BUSINESS: "Business", TECHNOLOGY: "AI & Tech", EVENT: "Event", REGULATION: "Regulation", PARTNERSHIP: "Partnership", NEWS: "News",
 }
@@ -18,12 +22,16 @@ export function NewsCard({ item, activityView = false, repostGroup, saved, read,
     <article className="group relative rounded-xl border border-[#e8eae7] bg-white px-5 py-5 transition-[border-color,box-shadow] duration-200 hover:border-[#cfd8d1] hover:shadow-[0_8px_30px_rgba(30,40,35,0.045)] sm:px-6">
       {item.priority === "HIGH" ? <span aria-hidden="true" className="absolute bottom-5 left-0 top-5 w-[3px] rounded-r-full bg-[#758f82]" /> : null}
       <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.12em]">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.12em]">
           <span className="text-[#4f7161]">{activityView ? item.linkedin?.kind === "REPOST" ? "Repost" : item.linkedin?.kind === "ARTICLE" ? "Article" : "Post" : categoryLabels[analysis.category]}</span>
           <span className="text-[#c1c9c3]">·</span>
           <span className={cn(item.priority === "HIGH" ? "text-[#587463]" : "text-[#8b9690]")}>{item.priority === "HIGH" ? "High priority" : item.priority === "MEDIUM" ? "Medium priority" : "Normal priority"}</span>
           <span className="text-[#c1c9c3]">·</span>
           <span className={cn("rounded-full px-2 py-0.5", read ? "bg-[#f0f2ef] text-[#66756a]" : "bg-[#e3f1e5] text-[#346b45]")}>{read ? "Read" : "Unread"}</span>
+          <span aria-hidden="true" className="text-[#c1c9c3]">·</span>
+          <span aria-label="Source type" className="normal-case tracking-normal text-[#4f7161]">{sourceTypeLabels[item.sourceType] ?? item.sourceType}</span>
+          <span aria-hidden="true" className="text-[#c1c9c3]">·</span>
+          <span aria-label="Source name" className="max-w-full break-words normal-case tracking-normal text-[#55645a]">{item.sourceName}</span>
         </div>
         <button type="button" onClick={() => onToggleSaved(item.id)} aria-label={saved ? `Remove ${item.title} from saved` : `Save ${item.title}`} aria-pressed={saved} title={saved ? "Remove from saved" : "Save item"} className={cn("-mr-2 -mt-2 rounded-lg p-2 text-[#87918b] transition-colors hover:bg-[#f3f5f2] hover:text-[#293e32] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5e806c]", saved && "text-[#4d715d]")}><Bookmark className={cn("size-[18px]", saved && "fill-current")} /></button>
       </div>
@@ -42,8 +50,8 @@ export function NewsCard({ item, activityView = false, repostGroup, saved, read,
       {repostGroup && item.repostGuidance?.[repostGroup] ? <details className="mt-4 rounded-lg bg-[#f6f8f5] p-3 text-xs text-[#68776b]"><summary className="cursor-pointer font-medium">{repostGroup === "CEO" ? "CEO" : "Company"} interaction guidance</summary><p className="mt-2 leading-5">{item.repostGuidance[repostGroup]}</p></details> : null}
       {item.linkedin ? <LinkedInActivity activity={item.linkedin} /> : null}
       <div className="mt-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-t border-[#eef0ed] pt-4">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#858e88]"><span className="font-medium text-[#55645a]">{item.sourceName}</span><span>·</span><time dateTime={item.publishedAt}>{dateFormat.format(new Date(item.publishedAt))}</time><span className="hidden sm:inline">·</span><span className="hidden sm:inline">{analysis.tags.slice(0, 2).join(" · ")}</span></div>
-        <div className="flex items-center gap-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#858e88]"><span className="font-medium text-[#55645a]">{item.sourceName}</span><span>·</span><time dateTime={item.publishedAt} title="Publication time (Europe/Budapest)">{publishedDateFormat.format(new Date(item.publishedAt))}</time><span className="hidden sm:inline">·</span><span className="hidden sm:inline">{analysis.tags.slice(0, 2).join(" · ")}</span></div>
+        <div className="flex max-w-full flex-wrap items-center gap-1">
           {canAnalyze ? <DeepInsightAction item={item} apiFetch={apiFetch} /> : null}
           {canEmail ? <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs text-[#68776b] hover:bg-[#f0f4ef]" disabled={emailBusy || Boolean(item.emailedAt)} onClick={() => onEmail(item.id)} title={item.emailedAt ? `Already sent to ${emailRecipient}` : `Send to ${emailRecipient}`} aria-label={item.emailedAt ? `${item.title} sent to ${emailRecipient}` : `Email ${item.title} to ${emailRecipient}`}>{emailSending ? <LoaderCircle className="size-3.5 animate-spin" /> : item.emailedAt ? <Check className="size-3.5" /> : <Mail className="size-3.5" />}{emailSending ? "Sending" : item.emailedAt ? "Sent" : "Email"}</Button> : null}
           <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs text-[#68776b] hover:bg-[#f0f4ef]" onClick={() => onSetRead(item.id, !read)}>{read ? <RotateCcw className="size-3.5" /> : <Check className="size-3.5" />}{read ? "Mark unread" : "Mark read"}</Button>
