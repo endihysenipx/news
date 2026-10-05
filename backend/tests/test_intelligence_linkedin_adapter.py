@@ -94,6 +94,24 @@ def test_first_check_covers_recent_posts_then_uses_incremental_window():
     assert collection_start_date(datetime(2026, 9, 20, tzinfo=timezone.utc), now) == "2026-09-19"
 
 
+@pytest.mark.parametrize("content_type", ["text/plain", "text/html"])
+def test_inactive_provider_account_has_actionable_error(content_type):
+    adapter = BrightDataLinkedInAdapter("private-token", "test-dataset")
+    response = httpx.Response(400, text="Customer is not active", headers={"content-type": content_type},
+                              request=httpx.Request("POST", "https://api.brightdata.com/datasets/v3/trigger"))
+    with pytest.raises(LinkedInCollectionError, match=r"HTTP 400.*account is inactive.*Activate"):
+        adapter._json(response)
+
+
+def test_plain_text_provider_errors_redact_token_and_strip_html():
+    adapter = BrightDataLinkedInAdapter("private-token", "test-dataset")
+    response = httpx.Response(400, text="<p>Invalid private-token</p><script>secret()</script>",
+                              request=httpx.Request("POST", "https://api.brightdata.com/datasets/v3/trigger"))
+    with pytest.raises(LinkedInCollectionError, match=r"HTTP 400.*Invalid \[redacted\]") as error:
+        adapter._json(response)
+    assert "secret()" not in str(error.value)
+
+
 def test_linkedin_activity_preserves_reposts_comments_and_unknown_counts():
     source = SimpleNamespace(name="Company", url="https://www.linkedin.com/company/company/")
     post = parse_posts([{

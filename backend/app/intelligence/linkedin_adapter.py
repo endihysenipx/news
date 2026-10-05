@@ -206,7 +206,10 @@ class BrightDataLinkedInAdapter:
                     if isinstance(value, str):
                         detail = value.replace(self.token, "[redacted]")[:250]
             except ValueError:
-                pass
+                # Some provider failures (including inactive accounts) are plain text.
+                detail = _text(response.text.replace(self.token, "[redacted]"), 250) or ""
+            if "customer is not active" in detail.casefold():
+                detail = "Bright Data account is inactive. Activate the account in Bright Data to resume LinkedIn checks."
             suffix = f" {detail}" if detail else ""
             raise LinkedInCollectionError(f"Provider request failed (HTTP {response.status_code}).{suffix}") from exc
         except ValueError as exc:

@@ -13,6 +13,7 @@ from app.db import AppMetadata, Base, SessionLocal, engine
 from app.import_primeflow import import_export
 from app.intelligence import models  # noqa: F401 - registers isolated tables
 from app.intelligence.collection import check_due_sources
+from app.intelligence.company_sources import ensure_company_sources
 from app.intelligence.digest_service import run_digest_cycle
 from app.intelligence.router import router as intelligence_router
 from app.intelligence.digest_router import router as digest_router
@@ -31,6 +32,8 @@ async def lifespan(_: FastAPI):
             imported = await session.scalar(select(AppMetadata.key).where(AppMetadata.key == "primeflow_snapshot_imported"))
         if not imported:
             await import_export(snapshot)
+    async with SessionLocal() as session:
+        await ensure_company_sources(session)
     scheduler = AsyncIOScheduler(timezone="UTC")
     if settings.NEWS_ENABLE_COLLECTION:
         scheduler.add_job(check_due_sources, "interval", minutes=5, next_run_time=datetime.now(timezone.utc), max_instances=1)
