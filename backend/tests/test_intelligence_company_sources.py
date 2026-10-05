@@ -27,3 +27,27 @@ def test_install_does_not_recreate_intentionally_removed_company():
     asyncio.run(ensure_company_sources(db))
     db.scalars.assert_not_awaited()
     db.commit.assert_not_awaited()
+
+
+def test_personal_activity_source_installs_once_without_email_subscription():
+    from app.intelligence.company_sources import ensure_personal_activity_source, PROFILE_URL
+    added = []
+    db = SimpleNamespace(get=AsyncMock(return_value=None),
+                         scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: [])),
+                         add=added.append, commit=AsyncMock())
+    asyncio.run(ensure_personal_activity_source(db))
+    sources = [row for row in added if isinstance(row, NewsSource)]
+    assert len(sources) == 1 and sources[0].url == PROFILE_URL
+    assert all(isinstance(row, (NewsSource, AppMetadata)) for row in added)
+
+
+def test_personal_activity_source_preserves_existing_profile():
+    from app.intelligence.company_sources import ensure_personal_activity_source, PROFILE_URL
+    existing = SimpleNamespace(url=PROFILE_URL, status="PAUSED")
+    added = []
+    db = SimpleNamespace(get=AsyncMock(return_value=None),
+                         scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: [existing])),
+                         add=added.append, commit=AsyncMock())
+    asyncio.run(ensure_personal_activity_source(db))
+    assert not any(isinstance(row, NewsSource) for row in added)
+    assert existing.status == "PAUSED"
