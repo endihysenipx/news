@@ -16,7 +16,7 @@ from app.db import SessionLocal
 from app.intelligence.ai_service import analyze_news_item
 from app.intelligence.generic_website_adapter import GenericWebsiteAdapter
 from app.intelligence.linkedin_adapter import BrightDataLinkedInAdapter, LinkedInCollectionError
-from app.intelligence.models import NewsAnalysis, NewsItem, NewsSource
+from app.intelligence.models import NewsAnalysis, NewsItem, NewsSource, NewsSourceEmailSubscription
 from app.intelligence.rss_adapter import RSSAdapter, RSSCollectionError, rss_url_is_supported
 from app.intelligence.services import CollectedNewsItem
 from app.intelligence.website_adapter import OfficialWebsiteAdapter, WebsiteCollectionError, WebsiteEntry, source_kind
@@ -77,7 +77,12 @@ async def _store_post(db: AsyncSession, source: NewsSource, post: CollectedNewsI
         return False
     analysis = await analyze_news_item(post, source)
     if not category_allowed(source.categories or [], analysis.category):
-        return False
+        # An email subscription requests all activity from this source.
+        subscribed = await db.scalar(select(NewsSourceEmailSubscription.source_id).where(
+            NewsSourceEmailSubscription.source_id == source.id,
+        ))
+        if subscribed is None:
+            return False
     item = NewsItem(
         source_id=source.id, external_id=post.external_id, url=post.url,
         title=post.title, original_text=post.original_text,

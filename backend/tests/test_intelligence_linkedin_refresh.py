@@ -4,8 +4,25 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
+import pytest
+
 from app.intelligence import collection
 from app.intelligence.services import CollectedNewsItem
+
+
+@pytest.mark.parametrize("subscribed,expected", [(True, True), (False, False)])
+def test_email_subscription_keeps_activity_outside_category_filter(monkeypatch, subscribed, expected):
+    source = SimpleNamespace(id=uuid4(), type="RSS", categories=["GRANTS"])
+    stored = []
+    db = SimpleNamespace(scalar=AsyncMock(side_effect=[None, source.id if subscribed else None]),
+                         add=stored.append, flush=AsyncMock())
+    analysis = SimpleNamespace(summary="News", category="BUSINESS", importanceScore=10, relevanceScore=10,
+                               whyItMatters=None, deadline=None, fundingAmount=None, eligibility=None,
+                               opportunityType=None, tags=[])
+    monkeypatch.setattr(collection, "analyze_news_item", AsyncMock(return_value=analysis))
+    post = CollectedNewsItem("email-news", "https://example.com/news", "News", "Body", None)
+    assert asyncio.run(collection._store_post(db, source, post)) is expected
+    assert len(stored) == (2 if subscribed else 0)
 
 
 def test_engagement_refresh_keeps_existing_item_and_skips_ai(monkeypatch):

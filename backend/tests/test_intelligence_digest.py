@@ -10,10 +10,16 @@ from app.intelligence.schemas import DigestSettingsInput
 
 
 def row(source_name, url, created_at):
-    item = SimpleNamespace(url=url, title=f"Notice {url.rsplit('/', 1)[-1]}", created_at=created_at)
+    item = SimpleNamespace(id=uuid4(), url=url, title=f"Notice {url.rsplit('/', 1)[-1]}", created_at=created_at,
+                           published_at=created_at, original_text="Original body", linkedin_data=None)
     analysis = SimpleNamespace(summary="A useful opportunity.", deadline=None)
-    source = SimpleNamespace(name=source_name)
+    source = source_fixture(source_name)
     return item, analysis, source
+
+
+def source_fixture(name):
+    return SimpleNamespace(id=uuid4(), name=name, type="RSS", last_checked_at=None,
+                           last_error=None, pending_snapshot_id=None)
 
 
 class FakeResult:
@@ -43,7 +49,7 @@ class FakeSession:
     async def scalars(self, query):
         if query.column_descriptions[0]["entity"] is digest_service.NewsSource:
             return FakeResult(self.sources)
-        return FakeResult([delivery.url_hash for delivery in self.deliveries])
+        return FakeResult(self.deliveries)
 
     def add(self, delivery):
         self.deliveries.append(delivery)
@@ -70,11 +76,11 @@ def test_digest_groups_sources_and_sends_only_new_items(monkeypatch):
 
     async def run():
         count = await digest_service.process_digest(db, user_id, datetime(2026, 9, 30, 15, 1, tzinfo=timezone.utc))
-        assert count == 2
+        assert count == 3
         assert len(sent) == 1
         assert "Grants" in sent[0][1] and "Business" in sent[0][1]
-        assert sent[0][1].count("https://example.org/one") == 1
-        assert len(db.deliveries) == 2
+        assert sent[0][1].count("https://example.org/one") == 2
+        assert len(db.deliveries) == 3
 
         third = row("Grants", "https://example.org/three", datetime(2026, 9, 30, 17, tzinfo=timezone.utc))
         db.rows.extend([third])
@@ -86,9 +92,9 @@ def test_digest_groups_sources_and_sends_only_new_items(monkeypatch):
         count = await digest_service.process_digest(db, user_id, datetime(2026, 10, 1, 10, 31, tzinfo=timezone.utc))
         assert count == 0
         assert len(sent) == 3
-        assert "Nuk ka lajme të reja" in sent[2][0]
+        assert "0 aktivitete të reja" in sent[2][0]
         assert "https://example.org/one" not in sent[2][1]
-        assert len(db.deliveries) == 3
+        assert len(db.deliveries) == 4
 
     asyncio.run(run())
 
@@ -107,14 +113,14 @@ def test_empty_report_is_sent_once_per_slot_and_lists_selected_sources(monkeypat
 
     monkeypatch.setattr(digest_service, "_send_digest", fake_send)
     digest = SimpleNamespace(times=["17:00", "21:00"], last_slot_at=datetime(2026, 9, 30, 10, 30, tzinfo=timezone.utc), last_sent_at=None, last_error=None)
-    db = FakeSession(digest, [], sources=[SimpleNamespace(name="KIESA & Lajme"), SimpleNamespace(name="EU Digital")])
+    db = FakeSession(digest, [], sources=[source_fixture("KIESA & Lajme"), source_fixture("EU Digital")])
     user_id = uuid4()
 
     async def run():
         now = datetime(2026, 9, 30, 15, 1, tzinfo=timezone.utc)
         assert await digest_service.process_digest(db, user_id, now) == 0
         assert len(sent) == 1
-        assert "Nuk ka lajme të reja" in sent[0][0]
+        assert "0 aktivitete të reja" in sent[0][0]
         assert "KIESA & Lajme" in sent[0][1] and "EU Digital" in sent[0][1]
         assert "KIESA &amp; Lajme" in sent[0][2]
         assert "17:00" in sent[0][1]
@@ -150,7 +156,7 @@ def test_failed_empty_report_retries_without_advancing_slot(monkeypatch):
     monkeypatch.setattr(digest_service, "_send_digest", fake_send)
     previous = datetime(2026, 9, 30, 10, 30, tzinfo=timezone.utc)
     digest = SimpleNamespace(times=["17:00"], last_slot_at=previous, last_sent_at=None, last_error=None)
-    db = FakeSession(digest, [], sources=[SimpleNamespace(name="KIESA")])
+    db = FakeSession(digest, [], sources=[source_fixture("KIESA")])
     user_id = uuid4()
     now = datetime(2026, 9, 30, 15, 1, tzinfo=timezone.utc)
 
