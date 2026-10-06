@@ -65,13 +65,14 @@ try {
 
     $queue = Join-Path $deployRoot 'cleanup-queue'
     New-Item -ItemType Directory -Path $queue | Out-Null
-    ConvertTo-Json -InputObject @($stage) | Set-Content -LiteralPath (Join-Path $queue 'request.json')
+    ConvertTo-Json -InputObject @($stage, $backup) | Set-Content -LiteralPath (Join-Path $queue 'request.json')
     $heldLock = [IO.File]::Open((Join-Path $queue 'worker.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
     try { & (Join-Path $PSScriptRoot 'cleanup.ps1') -Root $testRoot }
     finally { $heldLock.Dispose() }
     Assert-Test (Test-Path -LiteralPath $stage) 'A concurrent cleanup worker must not process the queue.'
     & (Join-Path $PSScriptRoot 'cleanup.ps1') -Root $testRoot
     Assert-Test (-not (Test-Path -LiteralPath $stage)) 'Cleanup must remove the queued stage.'
+    Assert-Test (-not (Test-Path -LiteralPath $backup)) 'Cleanup must process multiple paths in the same request.'
     Assert-Test (Test-Path -LiteralPath (Join-Path $shared 'keep.txt')) 'Cleanup must preserve junction targets.'
     Assert-Test (-not (Test-Path -LiteralPath (Join-Path $queue 'request.json'))) 'Successful cleanup must drain its queue.'
     Write-Output 'PASS: dependency invalidation, partial/full rollback, cleanup boundaries, junction safety, worker lock.'

@@ -46,8 +46,9 @@ try {
         if (-not $requests.Count) { break }
         foreach ($request in $requests) {
             try {
-                $paths = @(Get-Content -LiteralPath $request.FullName -Raw | ConvertFrom-Json)
+                $paths = Get-Content -LiteralPath $request.FullName -Raw | ConvertFrom-Json
                 foreach ($path in $paths) {
+                    if ($path -isnot [string]) { throw "Cleanup request contains a non-string path." }
                     Assert-CleanupPath $path
                     if (Test-Path -LiteralPath $path) { Remove-CleanupTree $path }
                 }
