@@ -45,3 +45,14 @@ jobs:
           NEWS_API_INTERNAL_URL: http://127.0.0.1:8001
       - name: Check backend Python syntax
         run: python -m compileall -q backend
+
+  verify-windows-deployment:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test deployment rollback and cleanup with Windows PowerShell
+        shell: powershell
+        run: ./deploy/test-deploy.ps1
