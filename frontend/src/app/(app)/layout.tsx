@@ -11,7 +11,7 @@ import { filters } from "@/features/intelligence/components/news-filters"
 const sections = [
   { label: "Overview", href: "/intelligence", icon: LayoutDashboard },
   { label: "For You", href: "/intelligence/for-you", icon: Sparkles },
-  { label: "INT Linkedin Activity", href: "/intelligence/primex-linkedin", icon: Linkedin },
+  { label: "SMM LIST ACTIVITY", href: "/intelligence/primex-linkedin", icon: Linkedin },
   { label: "News", href: "/intelligence/news", icon: Newspaper },
   { label: "Opportunities", href: "/intelligence/opportunities", icon: BriefcaseBusiness },
   { label: "Saved", href: "/intelligence/saved", icon: Bookmark },

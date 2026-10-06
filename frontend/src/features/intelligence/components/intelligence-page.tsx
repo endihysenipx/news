@@ -334,7 +334,7 @@ export function IntelligenceWorkspace({ view, user, apiFetch }: { view: Intellig
   const today = new Date()
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
   const upcoming = items.filter((item) => item.analysis.deadline && new Date(`${item.analysis.deadline}T12:00:00`).getTime() >= todayStart).sort((a, b) => (a.analysis.deadline || "").localeCompare(b.analysis.deadline || "")).slice(0, 3)
-  const pageHeading = highPriorityOnly ? "High priority" : activityView ? "INT Linkedin Activity" : view === "overview" ? "Overview" : view === "for-you" ? "For You" : view === "news" ? "News" : view === "saved" ? "Saved" : "Opportunities"
+  const pageHeading = highPriorityOnly ? "High priority" : activityView ? "SMM LIST ACTIVITY" : view === "overview" ? "Overview" : view === "for-you" ? "For You" : view === "news" ? "News" : view === "saved" ? "Saved" : "Opportunities"
 
   return <div className="min-h-screen px-4 pb-16 pt-7 text-[#24342a] sm:px-7 lg:px-10 lg:pt-10">
     <div className="mx-auto max-w-[1370px]">
