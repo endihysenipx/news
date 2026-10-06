@@ -334,7 +334,7 @@ export function IntelligenceWorkspace({ view, user, apiFetch }: { view: Intellig
   const today = new Date()
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
   const upcoming = items.filter((item) => item.analysis.deadline && new Date(`${item.analysis.deadline}T12:00:00`).getTime() >= todayStart).sort((a, b) => (a.analysis.deadline || "").localeCompare(b.analysis.deadline || "")).slice(0, 3)
-  const pageHeading = highPriorityOnly ? "High priority" : activityView ? "SMM LIST ACTIVITY" : view === "overview" ? "Overview" : view === "for-you" ? "For You" : view === "news" ? "News" : view === "saved" ? "Saved" : "Opportunities"
+  const pageHeading = highPriorityOnly ? "High priority" : activityView ? "INT Linkedin Activity" : view === "overview" ? "Overview" : view === "for-you" ? "For You" : view === "news" ? "News" : view === "saved" ? "Saved" : "Opportunities"
 
   return <div className="min-h-screen px-4 pb-16 pt-7 text-[#24342a] sm:px-7 lg:px-10 lg:pt-10">
     <div className="mx-auto max-w-[1370px]">
@@ -344,7 +344,7 @@ export function IntelligenceWorkspace({ view, user, apiFetch }: { view: Intellig
       </div>
 
       {activityView ? <nav aria-label="LinkedIn activity sections" className="flex flex-wrap gap-2 rounded-xl border border-[#e1e8e1] bg-white p-2">
-        {[{ label: "Account activity", href: "/intelligence/primex-linkedin", active: primexView }, { label: "Repost watch", href: "/intelligence/primex-linkedin?tab=repost-watch", active: view === "repost-watch" }].map((tab) => <Link key={tab.label} href={tab.href} aria-current={tab.active ? "page" : undefined} className={cn("rounded-lg px-4 py-2 text-sm font-medium", tab.active ? "bg-[#eaf1e9] text-[#214a31]" : "text-[#64746a] hover:bg-[#f5f7f3]")}>{tab.label}</Link>)}
+        {[{ label: "Account activity", href: "/intelligence/primex-linkedin", active: primexView }, { label: "SMM LIST ACTIVITY", href: "/intelligence/primex-linkedin?tab=repost-watch", active: view === "repost-watch" }].map((tab) => <Link key={tab.label} href={tab.href} aria-current={tab.active ? "page" : undefined} className={cn("rounded-lg px-4 py-2 text-sm font-medium", tab.active ? "bg-[#eaf1e9] text-[#214a31]" : "text-[#64746a] hover:bg-[#f5f7f3]")}>{tab.label}</Link>)}
       </nav> : null}
       {view === "repost-watch" ? <RepostWatchPanel group={repostGroup} apiFetch={apiFetch} /> : null}
       {primexView ? <div className="mt-7 rounded-xl border border-[#e5eae4] bg-white p-5">

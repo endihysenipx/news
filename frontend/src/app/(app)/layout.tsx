@@ -11,7 +11,7 @@ import { filters } from "@/features/intelligence/components/news-filters"
 const sections = [
   { label: "Overview", href: "/intelligence", icon: LayoutDashboard },
   { label: "For You", href: "/intelligence/for-you", icon: Sparkles },
-  { label: "SMM LIST ACTIVITY", href: "/intelligence/primex-linkedin", icon: Linkedin },
+  { label: "INT Linkedin Activity", href: "/intelligence/primex-linkedin", icon: Linkedin },
   { label: "News", href: "/intelligence/news", icon: Newspaper },
   { label: "Opportunities", href: "/intelligence/opportunities", icon: BriefcaseBusiness },
   { label: "Saved", href: "/intelligence/saved", icon: Bookmark },
@@ -72,7 +72,7 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
       <div className="flex-1 overflow-y-auto px-3 py-5">
         <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#94a096]">Workspace</p>
         <nav aria-label="Workspace sections" className="mt-3 space-y-1">
-          {sections.filter((section) => !section.adminOnly || user.role === "ADMIN").map(({ label, href, icon: Icon }) => <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} className={cn("group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#54775d]", pathname === href ? "bg-[#eaf1e9] text-[#214a31]" : "text-[#64746a] hover:bg-[#f5f7f3] hover:text-[#253c2c]")}><Icon className="size-[18px]" /><span className="flex-1">{label}</span>{href === "/intelligence/primex-linkedin" && repostUnread > 0 ? <span className="rounded-full bg-[#dcebdd] px-2 py-0.5 text-[10px] font-semibold" aria-label={`${repostUnread} unread repost watch posts`}>{repostUnread}</span> : null}{pathname === href ? <ChevronRight className="size-3.5 text-[#668672]" /> : null}</Link>)}
+          {sections.filter((section) => !section.adminOnly || user.role === "ADMIN").map(({ label, href, icon: Icon }) => <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} className={cn("group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#54775d]", pathname === href ? "bg-[#eaf1e9] text-[#214a31]" : "text-[#64746a] hover:bg-[#f5f7f3] hover:text-[#253c2c]")}><Icon className="size-[18px]" /><span className="flex-1">{label}</span>{href === "/intelligence/primex-linkedin" && repostUnread > 0 ? <span className="rounded-full bg-[#dcebdd] px-2 py-0.5 text-[10px] font-semibold" aria-label={`${repostUnread} unread SMM list posts`}>{repostUnread}</span> : null}{pathname === href ? <ChevronRight className="size-3.5 text-[#668672]" /> : null}</Link>)}
         </nav>
         <div className="my-6 border-t border-[#eef1ec]" />
         <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#94a096]">Quick view</p>
