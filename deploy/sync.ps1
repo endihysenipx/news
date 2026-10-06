@@ -10,6 +10,12 @@ $api = 'https://api.github.com/repos/endihysenipx/news/actions/workflows/deploy.
 $headers = @{ 'User-Agent' = 'NewsIntelligenceDeploy'; 'Accept' = 'application/vnd.github+json' }
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
+# Retry deferred cleanup independently, even when there is no new release.
+$cleanupWorker = Join-Path $deployRoot 'cleanup.ps1'
+if ((Test-Path -LiteralPath $cleanupWorker) -and (Get-ChildItem -LiteralPath (Join-Path $deployRoot 'cleanup-queue') -Filter '*.json' -ErrorAction SilentlyContinue)) {
+    Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -WindowStyle Hidden -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $cleanupWorker + '"'), '-Root', ('"' + $root + '"')) | Out-Null
+}
+
 function Invoke-Git([string[]]$arguments) {
     & $git @arguments
     if ($LASTEXITCODE -ne 0) { throw "git exited with code $LASTEXITCODE" }

@@ -4,6 +4,8 @@ $root = 'E:\websites\news-intelligence'
 $workspace = $env:GITHUB_WORKSPACE
 $python = 'C:\Users\Administrator\AppData\Local\Programs\Python\Python313\python.exe'
 $npm = 'C:\Program Files\nodejs\npm.cmd'
+$node = 'C:\Program Files\nodejs\node.exe'
+$started = Get-Date
 $tasks = @('NewsIntelligenceAPI', 'NewsIntelligenceWeb')
 
 if (-not $workspace -or -not (Test-Path -LiteralPath (Join-Path $workspace 'frontend\package-lock.json'))) {
@@ -16,6 +18,7 @@ foreach ($path in @($root, (Join-Path $root '.env'), $python, $npm)) {
 $deployRoot = Join-Path $root '_deploy'
 $stageRoot = Join-Path $deployRoot 'stage'
 $backupRoot = Join-Path $deployRoot 'backups'
+$cacheRoot = Join-Path $deployRoot 'node-cache'
 $revision = if ($env:GITHUB_SHA) { $env:GITHUB_SHA.Substring(0, [Math]::Min(12, $env:GITHUB_SHA.Length)) } else { 'manual' }
 $id = "$(Get-Date -Format yyyyMMddHHmmss)-$revision"
 $stage = Join-Path $stageRoot $id
@@ -91,7 +94,46 @@ function Wait-News {
     throw 'News did not pass the API and web health checks after deployment.'
 }
 
-New-Item -ItemType Directory -Path $stageRoot, $backupRoot -Force | Out-Null
+
+function Get-DependencyKey([string]$directory, [string]$runtime) {
+    $parts = @($runtime)
+    foreach ($name in @('package.json', 'package-lock.json', '.npmrc')) {
+        $path = Join-Path $directory $name
+        $parts += if (Test-Path -LiteralPath $path) { (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash } else { 'missing' }
+    }
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes(($parts -join '|'))))).Replace('-', '').ToLowerInvariant() }
+    finally { $sha.Dispose() }
+}
+
+function Restore-NewsDirectories([string[]]$names, [string]$failed) {
+    # A switch can fail between two directory moves. Restore only directories
+    # actually backed up; never move an untouched live directory out of service.
+    foreach ($name in $names) {
+        $live = Join-Path $root $name
+        $old = Join-Path $backup $name
+        if (Test-Path -LiteralPath $old) {
+            if (Test-Path -LiteralPath $live) { Move-NewsDirectory $live (Join-Path $failed $name) }
+            Move-NewsDirectory $old $live
+        }
+    }
+}
+
+function Queue-NewsCleanup([string[]]$paths) {
+    if (-not $paths.Count) { return }
+    $queue = Join-Path $deployRoot 'cleanup-queue'
+    New-Item -ItemType Directory -Path $queue -Force | Out-Null
+    foreach ($path in $paths) { Assert-NewsPath $path }
+    $request = Join-Path $queue (([guid]::NewGuid().ToString('N')) + '.json')
+    $temporary = $request + '.tmp'
+    ConvertTo-Json -InputObject @($paths) | Set-Content -LiteralPath $temporary -Encoding UTF8
+    Move-Item -LiteralPath $temporary -Destination $request
+    $worker = Join-Path $deployRoot 'cleanup.ps1'
+    Copy-Item -LiteralPath (Join-Path $workspace 'deploy\cleanup.ps1') -Destination $worker -Force
+    Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -WindowStyle Hidden -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $worker + '"'), '-Root', ('"' + $root + '"')) | Out-Null
+}
+
+New-Item -ItemType Directory -Path $stageRoot, $backupRoot, $cacheRoot -Force | Out-Null
 Assert-NewsPath $stage
 Assert-NewsPath $backup
 if (Test-Path -LiteralPath $stage) { throw "Deployment stage already exists: $stage" }
@@ -99,32 +141,93 @@ New-Item -ItemType Directory -Path $stage | Out-Null
 
 $switched = $false
 $stopping = $false
+$healthy = $false
+$replace = @('backend', 'frontend')
 try {
     Copy-Item -LiteralPath (Join-Path $workspace 'backend') -Destination $stage -Recurse
     Copy-Item -LiteralPath (Join-Path $workspace 'frontend') -Destination $stage -Recurse
 
-    Invoke-Checked $python @('-m', 'venv', (Join-Path $stage '.venv')) $stage
-    Invoke-Checked (Join-Path $stage '.venv\Scripts\python.exe') @(
-        '-m', 'pip', 'install', '--disable-pip-version-check', '-r', (Join-Path $stage 'backend\requirements.txt')
-    ) $stage
-    $env:PLAYWRIGHT_BROWSERS_PATH = '0'
-    Invoke-Checked (Join-Path $stage '.venv\Scripts\python.exe') @('-m', 'playwright', 'install', 'chromium') $stage
-
-    $env:NEWS_API_INTERNAL_URL = 'http://127.0.0.1:8001'
-    Invoke-Checked $npm @('ci', '--no-audit', '--no-fund') (Join-Path $stage 'frontend')
-    Invoke-Checked $npm @('run', 'build') (Join-Path $stage 'frontend')
-
-    foreach ($name in @('backend', 'frontend', '.venv')) {
-        if (-not (Test-Path -LiteralPath (Join-Path $stage $name))) {
-            throw "Build did not create $name"
+    $requirements = Join-Path $stage 'backend\requirements.txt'
+    $pythonRuntime = & $python -c "import platform,sys; print(platform.python_version()+'|'+sys.base_prefix)"
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot identify Python runtime.' }
+    $pythonKey = "$pythonRuntime|$((Get-FileHash -LiteralPath $requirements -Algorithm SHA256).Hash)"
+    $livePython = Join-Path $root '.venv\Scripts\python.exe'
+    $pythonStamp = Join-Path $root '.venv\.news-requirements-key'
+    $reusePython = $false
+    if (Test-Path -LiteralPath $livePython) {
+        if (Test-Path -LiteralPath $pythonStamp) {
+            $reusePython = (Get-Content -LiteralPath $pythonStamp -Raw).Trim() -eq $pythonKey
+        } else {
+            # Import the working environment from deployments made before caching.
+            $liveRequirements = Join-Path $root 'backend\requirements.txt'
+            $liveRuntime = & $livePython -c "import platform,sys; print(platform.python_version()+'|'+sys.base_prefix)"
+            $reusePython = $LASTEXITCODE -eq 0 -and $liveRuntime -eq $pythonRuntime -and
+                (Test-Path -LiteralPath $liveRequirements) -and
+                (Get-FileHash -LiteralPath $liveRequirements).Hash -eq (Get-FileHash -LiteralPath $requirements).Hash
         }
     }
+    if ($reusePython) {
+        Write-Output 'Reusing Python environment and installed Chromium (requirements/runtime unchanged).'
+        Invoke-Checked $livePython @('-m', 'pip', 'check') $stage
+    } else {
+        Write-Output 'Python dependencies changed; preparing a new isolated environment.'
+        Invoke-Checked $python @('-m', 'venv', (Join-Path $stage '.venv')) $stage
+        Invoke-Checked (Join-Path $stage '.venv\Scripts\python.exe') @(
+            '-m', 'pip', 'install', '--disable-pip-version-check', '-r', $requirements
+        ) $stage
+        $env:PLAYWRIGHT_BROWSERS_PATH = '0'
+        Invoke-Checked (Join-Path $stage '.venv\Scripts\python.exe') @('-m', 'playwright', 'install', 'chromium') $stage
+        Set-Content -LiteralPath (Join-Path $stage '.venv\.news-requirements-key') -Value $pythonKey -NoNewline
+        $replace += '.venv'
+    }
+
+    $nodeVersion = & $node --version
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot identify Node runtime.' }
+    $npmVersion = & $npm --version
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot identify npm runtime.' }
+    $nodeRuntime = "$nodeVersion|$npmVersion|$env:PROCESSOR_ARCHITECTURE"
+    $frontend = Join-Path $stage 'frontend'
+    $nodeKey = Get-DependencyKey $frontend $nodeRuntime
+    $nodeCache = Join-Path $cacheRoot $nodeKey
+    if (-not (Test-Path -LiteralPath (Join-Path $nodeCache '.ready'))) {
+        $pendingCache = Join-Path $stage 'node-dependencies'
+        New-Item -ItemType Directory -Path $pendingCache | Out-Null
+        foreach ($name in @('package.json', 'package-lock.json', '.npmrc')) {
+            $path = Join-Path $frontend $name
+            if (Test-Path -LiteralPath $path) { Copy-Item -LiteralPath $path -Destination $pendingCache }
+        }
+        $liveFrontend = Join-Path $root 'frontend'
+        $liveNodeStamp = Join-Path $liveFrontend '.news-node-key'
+        $canImport = (Test-Path -LiteralPath (Join-Path $liveFrontend 'node_modules\next\package.json')) -and
+            (Get-DependencyKey $liveFrontend $nodeRuntime) -eq $nodeKey -and
+            (-not (Test-Path -LiteralPath $liveNodeStamp) -or (Get-Content -LiteralPath $liveNodeStamp -Raw).Trim() -eq $nodeKey)
+        if ($canImport) {
+            Write-Output 'Seeding dependency cache from the working frontend (one-time copy).'
+            & robocopy.exe (Join-Path $liveFrontend 'node_modules') (Join-Path $pendingCache 'node_modules') /E /MT:16 /R:1 /W:1 /XJ /NFL /NDL /NJH /NJS /NP
+            if ($LASTEXITCODE -ge 8) { throw "Dependency cache copy failed: $LASTEXITCODE" }
+        } else {
+            Write-Output 'Frontend dependencies/runtime changed; running npm ci for a new cache entry.'
+            Invoke-Checked $npm @('ci', '--no-audit', '--no-fund') $pendingCache
+        }
+        if (-not (Test-Path -LiteralPath (Join-Path $pendingCache 'node_modules\next\dist\bin\next'))) {
+            throw 'Dependency cache is missing the Next.js executable.'
+        }
+        Set-Content -LiteralPath (Join-Path $pendingCache '.ready') -Value $nodeKey -NoNewline
+        Move-NewsDirectory $pendingCache $nodeCache
+    } else { Write-Output 'Reusing frontend dependency cache; npm ci skipped.' }
+    New-Item -ItemType Junction -Path (Join-Path $frontend 'node_modules') -Target (Join-Path $nodeCache 'node_modules') | Out-Null
+    Set-Content -LiteralPath (Join-Path $frontend '.news-node-key') -Value $nodeKey -NoNewline
+    $env:NEWS_API_INTERNAL_URL = 'http://127.0.0.1:8001'
+    # The dependency junction must fall inside Turbopack's filesystem root.
+    $env:NEWS_BUILD_ROOT = $root
+    Invoke-Checked $npm @('run', 'build') $frontend
+    if (-not (Test-Path -LiteralPath (Join-Path $frontend '.next\BUILD_ID'))) { throw 'Frontend build is incomplete.' }
 
     $stopping = $true
     Stop-News
     $switched = $true
     New-Item -ItemType Directory -Path $backup | Out-Null
-    foreach ($name in @('backend', 'frontend', '.venv')) {
+    foreach ($name in $replace) {
         $live = Join-Path $root $name
         $old = Join-Path $backup $name
         $new = Join-Path $stage $name
@@ -134,14 +237,10 @@ try {
 
     Start-News
     Wait-News
-    Write-Output "Deployed $($env:GITHUB_SHA) to $root"
-
-    $older = Get-ChildItem -LiteralPath $backupRoot -Directory |
-        Sort-Object CreationTimeUtc -Descending | Select-Object -Skip 2
-    foreach ($folder in $older) {
-        Assert-NewsPath $folder.FullName
-        Remove-Item -LiteralPath $folder.FullName -Recurse -Force
-    }
+    if ($reusePython) { Set-Content -LiteralPath $pythonStamp -Value $pythonKey -NoNewline }
+    Set-Content -LiteralPath (Join-Path $deployRoot 'deployed-sha.txt') -Value $env:GITHUB_SHA -NoNewline
+    $healthy = $true
+    Write-Output "Deployed $($env:GITHUB_SHA) to $root in $([math]::Round(((Get-Date) - $started).TotalSeconds)) seconds (health checks passed)."
 } catch {
     $failure = $_
     if ($switched) {
@@ -149,13 +248,7 @@ try {
         $failed = Join-Path $stage 'failed'
         Assert-NewsPath $failed
         New-Item -ItemType Directory -Path $failed -Force | Out-Null
-        foreach ($name in @('backend', 'frontend', '.venv')) {
-            $live = Join-Path $root $name
-            $old = Join-Path $backup $name
-            $failedPath = Join-Path $failed $name
-            if (Test-Path -LiteralPath $live) { Move-NewsDirectory $live $failedPath }
-            if (Test-Path -LiteralPath $old) { Move-NewsDirectory $old $live }
-        }
+        Restore-NewsDirectories $replace $failed
         Start-News
         Wait-News
     } elseif ($stopping) {
@@ -164,8 +257,12 @@ try {
     }
     throw $failure
 } finally {
-    if (Test-Path -LiteralPath $stage) {
-        Assert-NewsPath $stage
-        Remove-Item -LiteralPath $stage -Recurse -Force
-    }
+    # Housekeeping must not delay the next deploy or roll back a healthy release.
+    try {
+        $cleanup = @($stage)
+        if ($healthy) {
+            $cleanup += @(Get-ChildItem -LiteralPath $backupRoot -Directory | Sort-Object CreationTimeUtc -Descending | Select-Object -Skip 2 | ForEach-Object { $_.FullName })
+        }
+        Queue-NewsCleanup $cleanup
+    } catch { Write-Warning "Cleanup was deferred: $($_.Exception.Message)" }
 }
