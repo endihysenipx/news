@@ -34,20 +34,34 @@ def _post_url(value: object) -> str | None:
     return urlunparse(("https", "www.linkedin.com", parsed.path, "", "", ""))[:2000]
 
 
+def _reposter(record: dict) -> object:
+    return record.get("reposted_by") or record.get("shared_by")
+
+
+def _profile_id(value: object) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    if "://" not in value:
+        return value.strip().casefold()
+    parsed = urlparse(value)
+    path = parsed.path.strip("/").split("/")
+    if parsed.scheme == "https" and parsed.hostname and (
+        parsed.hostname == "linkedin.com" or parsed.hostname.endswith(".linkedin.com")
+    ) and not parsed.username and not parsed.password and len(path) == 2 and path[0] == "in":
+        return path[1].casefold()
+    return None
+
+
 def _belongs_to_source(record: dict, source: NewsSource) -> bool:
     source_path = urlparse(getattr(source, "url", "")).path.strip("/").split("/")
     if len(source_path) < 2 or source_path[0] != "in":
         return True
     profile_id = source_path[1].casefold()
-    reposter = record.get("reposted_by") or record.get("shared_by")
+    reposter = _reposter(record)
     if isinstance(reposter, dict):
         reposter = reposter.get("url") or reposter.get("user_url") or reposter.get("user_id")
-    if isinstance(reposter, str):
-        reposter_path = urlparse(reposter).path.strip("/").split("/")
-        if reposter.casefold() == profile_id or (
-            _linkedin_url(reposter) and reposter_path == ["in", source_path[1]]
-        ):
-            return True
+    if _profile_id(reposter) == profile_id:
+        return True
     author_id = record.get("user_id")
     if isinstance(author_id, str) and author_id:
         return author_id.casefold() == profile_id
@@ -111,7 +125,7 @@ def _activity(record: dict) -> dict:
     original_text = _text(repost.get("repost_text") or repost.get("post_text") or repost.get("text"), 20000)
     original_url = _post_url(repost.get("repost_url") or repost.get("url") or repost.get("post_url") or record.get("original_post_url"))
     post_type = str(record.get("post_type") or "").casefold()
-    kind = "REPOST" if post_type in {"repost", "share", "reshare", "shared_post"} or original_text or original_url else "ARTICLE" if post_type == "article" else "POST"
+    kind = "REPOST" if post_type in {"repost", "share", "reshare", "shared_post"} or original_text or original_url or _reposter(record) else "ARTICLE" if post_type == "article" else "POST"
     raw_comments = record.get("top_visible_comments")
     if not isinstance(raw_comments, list):
         raw_comments = record.get("comments")
@@ -165,7 +179,15 @@ def parse_posts(records: object, source: NewsSource) -> list[CollectedNewsItem]:
         body = record.get("post_text") or record.get("text") or record.get("headline") or ""
         body = " ".join(body.split()) if isinstance(body, str) else ""
         activity = _activity(record)
-        if activity["kind"] == "REPOST" and activity["originalPostText"]:
+        if activity["kind"] == "REPOST" and _reposter(record):
+            # A plain repost can retain the original author's fields and URL.
+            # The monitored account is the reposter, not the original author.
+            activity["originalAuthor"] = activity["originalAuthor"] or activity["authorName"]
+            activity["originalPostUrl"] = activity["originalPostUrl"] or url
+            activity["originalPostText"] = activity["originalPostText"] or _text(body, 20000)
+            activity["authorName"] = source.name
+            activity["authorUrl"] = _linkedin_url(getattr(source, "url", None))
+        if activity["kind"] == "REPOST" and activity["originalPostText"] and activity["originalPostText"] != body:
             body = f"{body}\nShared post: {activity['originalPostText']}".strip()
         title = record.get("title")
         if not isinstance(title, str) or not title.strip():

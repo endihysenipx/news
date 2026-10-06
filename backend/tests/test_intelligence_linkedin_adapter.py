@@ -43,6 +43,42 @@ def test_linkedin_source_requires_profile_or_company_page():
         NewsSourceCreate(**{**valid, "url": "https://www.linkedin.com/feed/"})
 
 
+@pytest.mark.parametrize("field", ["reposted_by", "shared_by"])
+@pytest.mark.parametrize("reposter", [
+    "example",
+    "https://www.linkedin.com/in/EXAMPLE/",
+    {"url": "https://de.linkedin.com/in/example/"},
+    {"user_id": "example"},
+])
+def test_plain_profile_repost_is_kept_and_classified_with_original_attribution(field, reposter):
+    source = SimpleNamespace(name="Example account", url="https://www.linkedin.com/in/example/")
+    post = parse_posts([{
+        "id": "42", "url": "https://www.linkedin.com/posts/other_update-42",
+        "user_id": "other", "user_name": "Original author", "post_text": "Original update",
+        field: reposter,
+    }], source)[0]
+    assert post.linkedin_data["kind"] == "REPOST"
+    assert post.linkedin_data["authorName"] == source.name
+    assert post.linkedin_data["authorUrl"] == source.url
+    assert post.linkedin_data["originalAuthor"] == "Original author"
+    assert post.linkedin_data["originalPostUrl"] == post.url
+    assert post.linkedin_data["originalPostText"] == "Original update"
+    assert post.original_text == "Original update"
+
+
+@pytest.mark.parametrize("reposter", [
+    "someone-else", {"url": "https://www.linkedin.com/in/someone-else/"},
+    {"url": "https://linkedin.com.evil.test/in/example/"},
+])
+def test_other_accounts_reposts_are_excluded(reposter):
+    source = SimpleNamespace(name="Example", url="https://www.linkedin.com/in/example/")
+    with pytest.raises(LinkedInCollectionError):
+        parse_posts([{
+            "url": "https://www.linkedin.com/posts/other_update-42",
+            "user_id": "other", "reposted_by": reposter,
+        }], source)
+
+
 def test_provider_trigger_uses_profile_discovery_and_snapshot_flow():
     requests: list[httpx.Request] = []
 
